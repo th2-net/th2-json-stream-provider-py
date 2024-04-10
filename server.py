@@ -7,10 +7,11 @@ from glob import glob
 import json
 import os.path
 import asyncio
+from argparse import ArgumentParser
 
 serverStatus: str = 'idle'
-notebooksDir: str = '.'
-resultsDir: str = '.'
+notebooksDir: str = ''
+resultsDir: str = ''
 
 def notebooksReg():
     return notebooksDir + '/*.ipynb'
@@ -18,10 +19,10 @@ def notebooksReg():
 def resultsReg():
     return resultsDir + '/*.json'
 
-def readConf():
+def readConf(path: str):
     global notebooksDir
     global resultsDir
-    file = open('config.json', "r")
+    file = open(path, "r")
     result = json.load(file)
     notebooksDir = result['notebooks'] or ''
     resultsDir = result['results'] or ''
@@ -175,8 +176,14 @@ async def reqResult(req: Request):
     return web.json_response(result)
 
 if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument('config')
+    path = vars(parser.parse_args()).get('config')
+    if (path):
+        readConf(path)
+
     app = web.Application()
-    readConf()
+    
     setup(app)
     app.router.add_route('GET', "/status", reqStatus)
     app.router.add_route('GET', "/files/all", reqFiles)
