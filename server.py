@@ -3,11 +3,28 @@ from aiohttp.web_request import Request
 from aiohttp import web
 from aiojobs.aiohttp import setup, spawn
 from aiohttp_swagger import *
+from glob import glob
 import json
 import os.path
 import asyncio
 
-serverStatus = 'idle'
+serverStatus: str = 'idle'
+notebooksDir: str = ''
+resultsDir: str = ''
+
+def notebooksReg():
+    return notebooksDir + '/*.ipynb'
+
+def resultsReg():
+    return resultsDir + '/*.json'
+
+def readConf():
+    global notebooksDir
+    global resultsDir
+    file = open('config.json', "r")
+    result = json.load(file)
+    notebooksDir = result['notebooks'] or ''
+    resultsDir = result['results'] or ''
 
 async def reqStatus(req: Request):
     """
@@ -21,6 +38,7 @@ async def reqStatus(req: Request):
         "200":
             description: successful operation. Return json with server status
     """
+    global serverStatus
     return web.json_response({'status': serverStatus})
 
 async def reqFiles(req: Request):
@@ -35,8 +53,40 @@ async def reqFiles(req: Request):
         "200":
             description: successful operation. Return string array of available files.
     """
-    from glob import glob
-    files = glob('*.ipynb') + glob('*.json')
+    print(glob('notebooks' + '/*.ipynb'))
+    print(notebooksDir)
+    print(glob(notebooksReg()))
+    files = glob(notebooksReg()) + glob(resultsReg())
+    return web.json_response(files)
+
+async def reqNotebooks(req: Request):
+    """
+    ---
+    description: This end-point allows to get notebooks that could be requested.
+    tags:
+    - File operation
+    produces:
+    - application/json
+    responses:
+        "200":
+            description: successful operation. Return string array of available files.
+    """
+    files = glob(notebooksReg())
+    return web.json_response(files)
+
+async def reqJsons(req: Request):
+    """
+    ---
+    description: This end-point allows to get jsons that could be requested.
+    tags:
+    - File operation
+    produces:
+    - application/json
+    responses:
+        "200":
+            description: successful operation. Return string array of available files.
+    """
+    files = glob(resultsDir + resultsReg())
     return web.json_response(files)
 
 async def reqArguments(req: Request):
@@ -60,7 +110,10 @@ async def reqArguments(req: Request):
     return web.json_response(params)
 
 async def launchNotebook(input, arguments = None):
-        pm.execute_notebook(input, 'lauchLogs.json', arguments)
+        global serverStatus
+        serverStatus = 'busy'
+        pm.execute_notebook(input, None, arguments)
+        serverStatus = 'idle'
 
 async def reqLaunch(req: Request):
     """
@@ -88,7 +141,7 @@ async def reqLaunch(req: Request):
     if not path or not os.path.isfile(path):
         return web.HTTPNotFound()
     from uuid import uuid4
-    output_path = '%s.json' % str(uuid4())
+    output_path = resultsDir + '/%s.json' % str(uuid4())
     parameters = await req.json()
     parameters['output_path'] = output_path
     asyncio.shield(spawn(req, launchNotebook(path, parameters)))
@@ -123,9 +176,12 @@ async def reqResult(req: Request):
 
 if __name__ == '__main__':
     app = web.Application()
+    readConf()
     setup(app)
     app.router.add_route('GET', "/status", reqStatus)
     app.router.add_route('GET', "/files/all", reqFiles)
+    app.router.add_route('GET', "/files/notebooks", reqNotebooks)
+    app.router.add_route('GET', "/files/jsons", reqJsons)
     app.router.add_route('GET', "/files", reqArguments)
     app.router.add_route('POST', "/execute", reqLaunch)
     app.router.add_route('GET', "/result", reqResult)
