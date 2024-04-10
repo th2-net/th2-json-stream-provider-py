@@ -9,8 +9,8 @@ import os.path
 import asyncio
 
 serverStatus: str = 'idle'
-notebooksDir: str = ''
-resultsDir: str = ''
+notebooksDir: str = '.'
+resultsDir: str = '.'
 
 def notebooksReg():
     return notebooksDir + '/*.ipynb'
