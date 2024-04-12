@@ -13,11 +13,11 @@ serverStatus: str = 'idle'
 notebooksDir: str = ''
 resultsDir: str = ''
 
-def notebooksReg():
-    return notebooksDir + '/*.ipynb'
+def notebooksReg(path):
+    return path + '/*.ipynb'
 
-def resultsReg():
-    return resultsDir + '/*.json'
+def resultsReg(path):
+    return path + '/*.json'
 
 def readConf(path: str):
     global notebooksDir
@@ -45,6 +45,12 @@ async def reqStatus(req: Request):
     global serverStatus
     return web.json_response({'status': serverStatus})
 
+def addParent(path, parentPath):
+    return '%s/%s' %(parentPath, path)
+
+def getDirs(path):
+    return map(lambda dir: addParent(dir, path), filter(os.path.isdir, os.listdir(path)))
+
 async def reqFiles(req: Request):
     """
     ---
@@ -57,8 +63,29 @@ async def reqFiles(req: Request):
         "200":
             description: successful operation. Return string array of available files.
     """
-    files = glob(notebooksReg()) + glob(resultsReg())
-    return web.json_response(files)
+    path = req.rel_url.query and req.rel_url.query['path']
+    #print(os.listdir(notebooksDir))
+    #print(os.listdir(resultsDir))
+    if path:
+        if os.path.isdir(path):
+            dirs = list(getDirs(path))
+            files = glob(notebooksReg(path)) + glob(resultsReg(path))
+            return web.json_response({
+                'directories': dirs,
+                'files': files
+            })
+        else:
+            return web.json_response({
+                'directories': [],
+                'files': []
+            })
+    dirsNote = getDirs(notebooksDir)
+    dirsRes = getDirs(resultsDir)
+    files = glob(notebooksReg(notebooksDir)) + glob(resultsReg(resultsDir))
+    return web.json_response({
+        'directories': list({*dirsNote, *dirsRes}),
+        'files': files
+    })
 
 async def reqNotebooks(req: Request):
     """
