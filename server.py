@@ -22,10 +22,13 @@ def resultsReg():
 def readConf(path: str):
     global notebooksDir
     global resultsDir
-    file = open(path, "r")
-    result = json.load(file)
-    notebooksDir = result['notebooks'] or ''
-    resultsDir = result['results'] or ''
+    try:
+        file = open(path, "r")
+        result = json.load(file)
+        notebooksDir = result['notebooks'] or ''
+        resultsDir = result['results'] or ''
+    except:
+        print('there were error with reading conf file')
 
 async def reqStatus(req: Request):
     """
@@ -54,9 +57,6 @@ async def reqFiles(req: Request):
         "200":
             description: successful operation. Return string array of available files.
     """
-    print(glob('notebooks' + '/*.ipynb'))
-    print(notebooksDir)
-    print(glob(notebooksReg()))
     files = glob(notebooksReg()) + glob(resultsReg())
     return web.json_response(files)
 
@@ -110,11 +110,20 @@ async def reqArguments(req: Request):
     params = pm.inspect_notebook(path)
     return web.json_response(params)
 
+
+
 async def launchNotebook(input, arguments = None):
         global serverStatus
         serverStatus = 'busy'
-        pm.execute_notebook(input, None, arguments)
-        serverStatus = 'idle'
+        logOut = '%s-log.json' % arguments['output_path'][:-5] if arguments and arguments['output_path'] else None
+        try:
+            pm.execute_notebook(input, logOut, arguments)
+        except Exception as error:
+            os.remove(arguments['output_path'])
+            os.rename(logOut, arguments['output_path'])
+            return web.HTTPInternalServerError(reason=error)
+        finally:
+            serverStatus = 'idle'
 
 async def reqLaunch(req: Request):
     """
@@ -173,6 +182,7 @@ async def reqResult(req: Request):
         return web.HTTPNotFound()
     file = open(path, "r")
     result = json.load(file)
+    #os.remove(file)
     return web.json_response(result)
 
 if __name__ == '__main__':
