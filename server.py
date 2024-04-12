@@ -75,10 +75,7 @@ async def reqFiles(req: Request):
                 'files': files
             })
         else:
-            return web.json_response({
-                'directories': [],
-                'files': []
-            })
+            return web.HTTPNotFound()
         
     if os.path.isdir(notebooksDir):
         dirsNote = getDirs(notebooksDir)
@@ -145,12 +142,13 @@ async def reqArguments(req: Request):
 async def launchNotebook(input, arguments = None):
         global serverStatus
         serverStatus = 'busy'
-        logOut = '%s-log.json' % arguments['output_path'][:-5] if arguments and arguments['output_path'] else None
+        logOut: str = ('%s-log.json' % str(arguments['output_path'][:-5])) if arguments and arguments['output_path'] else ''
         try:
-            pm.execute_notebook(input, logOut, arguments)
+            print(pm.execute_notebook(input, logOut, arguments))
         except Exception as error:
-            os.remove(arguments['output_path'])
-            os.rename(logOut, arguments['output_path'])
+            print(error)
+            #os.remove(arguments['output_path'])
+            #os.rename(logOut, arguments['output_path'])
             return web.HTTPInternalServerError(reason=error)
         finally:
             serverStatus = 'idle'
@@ -182,6 +180,8 @@ async def reqLaunch(req: Request):
         return web.HTTPNotFound()
     from uuid import uuid4
     output_path = resultsDir + '/%s.json' % str(uuid4())
+    if not os.path.exists(resultsDir):
+        return web.HTTPInternalServerError(reason='no output directory')
     parameters = await req.json()
     parameters['output_path'] = output_path
     asyncio.shield(spawn(req, launchNotebook(path, parameters)))
