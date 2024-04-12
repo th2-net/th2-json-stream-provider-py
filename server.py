@@ -49,7 +49,7 @@ def addParent(path, parentPath):
     return '%s/%s' %(parentPath, path)
 
 def getDirs(path):
-    return map(lambda dir: addParent(dir, path), filter(os.path.isdir, os.listdir(path)))
+    return  [f.path for f in os.scandir(path) if f.is_dir()]
 
 async def reqFiles(req: Request):
     """
