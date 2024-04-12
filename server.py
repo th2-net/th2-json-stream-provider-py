@@ -45,9 +45,6 @@ async def reqStatus(req: Request):
     global serverStatus
     return web.json_response({'status': serverStatus})
 
-def addParent(path, parentPath):
-    return '%s/%s' %(parentPath, path)
-
 def getDirs(path):
     return  [f.path for f in os.scandir(path) if f.is_dir()]
 
@@ -66,6 +63,9 @@ async def reqFiles(req: Request):
     path = req.rel_url.query and req.rel_url.query['path']
     #print(os.listdir(notebooksDir))
     #print(os.listdir(resultsDir))
+    
+    dirsNote = []
+    dirsRes = []
     if path:
         if os.path.isdir(path):
             dirs = list(getDirs(path))
@@ -79,8 +79,11 @@ async def reqFiles(req: Request):
                 'directories': [],
                 'files': []
             })
-    dirsNote = getDirs(notebooksDir)
-    dirsRes = getDirs(resultsDir)
+        
+    if os.path.isdir(notebooksDir):
+        dirsNote = getDirs(notebooksDir)
+    if os.path.isdir(resultsDir):
+        dirsRes = getDirs(resultsDir)
     files = glob(notebooksReg(notebooksDir)) + glob(resultsReg(resultsDir))
     return web.json_response({
         'directories': list({*dirsNote, *dirsRes}),
