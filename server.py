@@ -63,7 +63,10 @@ async def reqFiles(req: Request):
     path = req.rel_url.query and req.rel_url.query['path']
     #print(os.listdir(notebooksDir))
     #print(os.listdir(resultsDir))
-    
+    print(pm.inspection.papermill_translators._translators)
+    print(pm.inspection.papermill_translators.find_translator('python3', 'python'))
+    print(pm.inspection.papermill_translators.find_translator('python', 'python'))
+    print(pm.inspection.papermill_translators.find_translator('python', 'python') == pm.inspection.papermill_translators.find_translator('python3', 'python'))
     dirsNote = []
     dirsRes = []
     if path:
@@ -213,9 +216,7 @@ async def reqResult(req: Request):
     if not path or not os.path.isfile(path):
         return web.HTTPNotFound()
     file = open(path, "r")
-    result = json.load(file)
-    #os.remove(file)
-    return web.json_response(result)
+    return web.json_response({'result' : file.read()})
 
 if __name__ == '__main__':
     parser = ArgumentParser()
