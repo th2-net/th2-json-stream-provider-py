@@ -148,6 +148,7 @@ async def launchNotebook(input, arguments = None):
         except Exception as error:
             print(error)
             print(pm.inspection.papermill_translators.find_translator('python3', 'python'))
+            print(pm.inspection.papermill_translators.find_translator('python', 'python'))
             #os.remove(arguments['output_path'])
             #os.rename(logOut, arguments['output_path'])
             return web.HTTPInternalServerError(reason=error)
