@@ -181,10 +181,11 @@ async def reqLaunch(req: Request):
         return web.HTTPNotFound()
     if not os.path.exists(resultsDir):
         return web.HTTPInternalServerError(reason='no output directory')
-    notebookName = path.split('\\')[-1].split('.')[0];
+    notebookName = path.split('/')[-1].split('.')[0];
     timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
     file_name = notebookName + '_' + timestamp
     output_path = resultsDir + '/%s.jsonl' % str(file_name)
+    print(file_name)
     parameters = await req.json()
     parameters['output_path'] = output_path
     asyncio.shield(spawn(req, launchNotebook(path, parameters, file_name)))
