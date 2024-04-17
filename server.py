@@ -53,7 +53,7 @@ async def reqStatus(req: Request):
     return web.json_response({'status': serverStatus})
 
 def getDirs(path):
-    return  [f.path for f in os.scandir(path) if f.is_dir()]
+    return  [f.path for f in os.scandir(path) if f.is_dir() and f.name[0] != '.']
 
 async def reqFiles(req: Request):
     """
