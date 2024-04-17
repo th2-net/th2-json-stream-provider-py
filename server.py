@@ -5,6 +5,7 @@ from aiojobs.aiohttp import setup, spawn
 from aiohttp_swagger import *
 from glob import glob
 import json
+import datetime
 import os.path
 import asyncio
 from argparse import ArgumentParser
@@ -12,21 +13,27 @@ from argparse import ArgumentParser
 serverStatus: str = 'idle'
 notebooksDir: str = ''
 resultsDir: str = ''
+logDir: str | None = None
 
 def notebooksReg(path):
     return path + '/*.ipynb'
 
 def resultsReg(path):
-    return path + '/*.json'
+    return path + '/*.jsonl'
+
+def resultsLog(path):
+    return path + '/*.log.jsonl'
 
 def readConf(path: str):
     global notebooksDir
     global resultsDir
+    global logDir
     try:
         file = open(path, "r")
         result = json.load(file)
         notebooksDir = result['notebooks'] or ''
         resultsDir = result['results'] or ''
+        logDir = result['logs'] or None
     except:
         print('there were error with reading conf file')
 
@@ -61,12 +68,6 @@ async def reqFiles(req: Request):
             description: successful operation. Return string array of available files.
     """
     path = req.rel_url.query and req.rel_url.query['path']
-    #print(os.listdir(notebooksDir))
-    #print(os.listdir(resultsDir))
-    print(pm.inspection.papermill_translators._translators)
-    print(pm.inspection.papermill_translators.find_translator('python3', 'python'))
-    print(pm.inspection.papermill_translators.find_translator('python', 'python'))
-    print(pm.inspection.papermill_translators.find_translator('python', 'python') == pm.inspection.papermill_translators.find_translator('python3', 'python'))
     dirsNote = []
     dirsRes = []
     if path:
@@ -142,18 +143,13 @@ async def reqArguments(req: Request):
 
 
 
-async def launchNotebook(input, arguments = None):
+async def launchNotebook(input, arguments = None, file_name = None):
         global serverStatus
         serverStatus = 'busy'
-        logOut: str = ('%s-log.json' % str(arguments['output_path'][:-5])) if arguments and arguments['output_path'] else ''
+        logOut: str = (logDir + '/%s.log.json' % file_name) if logDir and file_name else None
         try:
-            print(pm.execute_notebook(input, logOut, arguments))
+            pm.execute_notebook(input, logOut, arguments)
         except Exception as error:
-            print(error)
-            print(pm.inspection.papermill_translators.find_translator('python3', 'python'))
-            print(pm.inspection.papermill_translators.find_translator('python', 'python'))
-            #os.remove(arguments['output_path'])
-            #os.rename(logOut, arguments['output_path'])
             return web.HTTPInternalServerError(reason=error)
         finally:
             serverStatus = 'idle'
@@ -183,13 +179,15 @@ async def reqLaunch(req: Request):
     path = req.rel_url.query['path']
     if not path or not os.path.isfile(path):
         return web.HTTPNotFound()
-    from uuid import uuid4
-    output_path = resultsDir + '/%s.json' % str(uuid4())
     if not os.path.exists(resultsDir):
         return web.HTTPInternalServerError(reason='no output directory')
+    notebookName = path.split('\\')[-1].split('.')[0];
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    file_name = notebookName + '_' + timestamp
+    output_path = resultsDir + '/%s.jsonl' % str(file_name)
     parameters = await req.json()
     parameters['output_path'] = output_path
-    asyncio.shield(spawn(req, launchNotebook(path, parameters)))
+    asyncio.shield(spawn(req, launchNotebook(path, parameters, file_name)))
     return web.json_response({'path': output_path})
         
 async def reqResult(req: Request):
@@ -216,7 +214,10 @@ async def reqResult(req: Request):
     if not path or not os.path.isfile(path):
         return web.HTTPNotFound()
     file = open(path, "r")
-    return web.json_response({'result' : file.read()})
+    content = file.read()
+    file.close()
+    #os.remove(path)
+    return web.json_response({'result' : content})
 
 if __name__ == '__main__':
     parser = ArgumentParser()
