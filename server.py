@@ -114,7 +114,7 @@ async def reqNotebooks(req: Request):
     dirsNote = []
     if path:
         if os.path.isdir(pathConverted):
-            dirs = getDirs(pathConverted)
+            dirs = list(map(replaceNotebooksPath, getDirs(pathConverted)))
             files = list(map(replaceNotebooksPath, glob(notebooksReg(pathConverted))))
             return web.json_response({
                 'directories': dirs,
@@ -151,7 +151,7 @@ async def reqJsons(req: Request):
     dirsNote = []
     if path:
         if os.path.isdir(pathConverted):
-            dirs = getDirs(pathConverted)
+            dirs = list(map(replaceResultsPath, getDirs(pathConverted)))
             files = list(map(replaceResultsPath, glob(resultsReg(pathConverted))))
             return web.json_response({
                 'directories': dirs,
