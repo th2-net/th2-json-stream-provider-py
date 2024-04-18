@@ -55,6 +55,9 @@ async def reqStatus(req: Request):
 def getDirs(path):
     return  [f.path for f in os.scandir(path) if f.is_dir() and f.name[0] != '.']
 
+def replaceSlashes(path: str):
+    return path.replace('\\', '/')
+
 async def reqFiles(req: Request):
     """
     ---
@@ -67,7 +70,7 @@ async def reqFiles(req: Request):
         "200":
             description: successful operation. Return string array of available files.
     """
-    path = req.rel_url.query and req.rel_url.query['path']
+    path = path = req.rel_url.query.get('path')
     dirsNote = []
     dirsRes = []
     if path:
@@ -91,6 +94,9 @@ async def reqFiles(req: Request):
         'files': files
     })
 
+def replaceNotebooksPath(path: str):
+    return replaceSlashes(path).replace(notebooksDir, '/notebooks')
+
 async def reqNotebooks(req: Request):
     """
     ---
@@ -103,8 +109,31 @@ async def reqNotebooks(req: Request):
         "200":
             description: successful operation. Return string array of available files.
     """
-    files = glob(notebooksReg())
-    return web.json_response(files)
+    path = req.rel_url.query.get('path')
+    pathConverted = path and notebooksDir + path
+    print(path, pathConverted)
+    dirsNote = []
+    if path:
+        if os.path.isdir(pathConverted):
+            dirs = getDirs(pathConverted)
+            files = list(map(replaceNotebooksPath, glob(notebooksReg(pathConverted))))
+            return web.json_response({
+                'directories': dirs,
+                'files': files
+            })
+        else:
+            return web.HTTPNotFound()
+        
+    if os.path.isdir(notebooksDir):
+        dirsNote = list(map(replaceNotebooksPath, getDirs(notebooksDir)))
+    files = list(map(replaceNotebooksPath, glob(notebooksReg(notebooksDir))))
+    return web.json_response({
+        'directories': dirsNote,
+        'files': files
+    })
+
+def replaceResultsPath(path: str):
+    return replaceSlashes(path).replace(resultsDir, '/results')
 
 async def reqJsons(req: Request):
     """
@@ -118,8 +147,27 @@ async def reqJsons(req: Request):
         "200":
             description: successful operation. Return string array of available files.
     """
-    files = glob(resultsDir + resultsReg())
-    return web.json_response(files)
+    path = req.rel_url.query.get('path')
+    pathConverted = path and resultsDir + path
+    dirsNote = []
+    if path:
+        if os.path.isdir(pathConverted):
+            dirs = getDirs(pathConverted)
+            files = list(map(replaceResultsPath, glob(resultsReg(pathConverted))))
+            return web.json_response({
+                'directories': dirs,
+                'files': files
+            })
+        else:
+            return web.HTTPNotFound()
+        
+    if os.path.isdir(resultsDir):
+        dirsNote = list(map(replaceResultsPath, getDirs(resultsDir)))
+    files = list(map(replaceResultsPath, glob(resultsReg(resultsDir))))
+    return web.json_response({
+        'directories': dirsNote,
+        'files': files
+    })
 
 async def reqArguments(req: Request):
     """
@@ -136,9 +184,10 @@ async def reqArguments(req: Request):
             description: requested file doesn't exist.
     """
     path = req.rel_url.query['path']
-    if not path or not os.path.isfile(path):
+    pathConverted = path and notebooksDir + path
+    if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
-    params = pm.inspect_notebook(path)
+    params = pm.inspect_notebook(pathConverted)
     return web.json_response(params)
 
 
@@ -176,20 +225,21 @@ async def reqLaunch(req: Request):
         return web.HTTPServiceUnavailable(reason='server is currently busy')
     if not req.can_read_body:
         return web.HTTPBadRequest(reason='body with parameters not present')
-    path = req.rel_url.query['path']
-    if not path or not os.path.isfile(path):
+    path = req.rel_url.query.get('path')
+    pathConverted = path and notebooksDir + path
+    if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
     if not os.path.exists(resultsDir):
         return web.HTTPInternalServerError(reason='no output directory')
-    notebookName = path.split('/')[-1].split('.')[0];
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    notebookName = pathConverted.split('/')[-1].split('.')[0];
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
     file_name = notebookName + '_' + timestamp
     output_path = resultsDir + '/%s.jsonl' % str(file_name)
-    print(file_name)
     parameters = await req.json()
     parameters['output_path'] = output_path
-    asyncio.shield(spawn(req, launchNotebook(path, parameters, file_name)))
-    return web.json_response({'path': output_path})
+    print(pathConverted)
+    asyncio.shield(spawn(req, launchNotebook(pathConverted, parameters, file_name)))
+    return web.json_response({'path': output_path.replace(resultsDir, '')})
         
 async def reqResult(req: Request):
     """
@@ -211,13 +261,13 @@ async def reqResult(req: Request):
     """
     if serverStatus != 'idle':
         return web.HTTPServiceUnavailable(reason='server is currently busy')
-    path = req.rel_url.query['path']
-    if not path or not os.path.isfile(path):
+    path = req.rel_url.query.get('path')
+    pathConverted = path and resultsDir + path
+    if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
-    file = open(path, "r")
+    file = open(pathConverted, "r")
     content = file.read()
     file.close()
-    #os.remove(path)
     return web.json_response({'result' : content})
 
 if __name__ == '__main__':
@@ -233,7 +283,7 @@ if __name__ == '__main__':
     app.router.add_route('GET', "/status", reqStatus)
     app.router.add_route('GET', "/files/all", reqFiles)
     app.router.add_route('GET', "/files/notebooks", reqNotebooks)
-    app.router.add_route('GET', "/files/jsons", reqJsons)
+    app.router.add_route('GET', "/files/results", reqJsons)
     app.router.add_route('GET', "/files", reqArguments)
     app.router.add_route('POST', "/execute", reqLaunch)
     app.router.add_route('GET', "/result", reqResult)
