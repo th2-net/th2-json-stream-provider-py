@@ -231,7 +231,7 @@ async def reqLaunch(req: Request):
     if not os.path.exists(resultsDir):
         return web.HTTPInternalServerError(reason='no output directory')
     notebookName = pathConverted.split('/')[-1].split('.')[0];
-    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%S-%f")
     file_name = notebookName + '_' + timestamp
     output_path = resultsDir + '/%s.jsonl' % str(file_name)
     parameters = await req.json()
