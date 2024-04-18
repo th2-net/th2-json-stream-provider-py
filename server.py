@@ -111,7 +111,6 @@ async def reqNotebooks(req: Request):
     """
     path = req.rel_url.query.get('path')
     pathConverted = path and notebooksDir + path
-    print(path, pathConverted)
     dirsNote = []
     if path:
         if os.path.isdir(pathConverted):
