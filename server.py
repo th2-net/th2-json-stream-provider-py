@@ -95,7 +95,7 @@ async def reqFiles(req: Request):
     })
 
 def replaceNotebooksPath(path: str):
-    return replaceSlashes(path).replace(notebooksDir, '/notebooks/')
+    return replaceSlashes(path).replace(notebooksDir, '/notebooks')
 
 async def reqNotebooks(req: Request):
     """
@@ -132,7 +132,7 @@ async def reqNotebooks(req: Request):
     })
 
 def replaceResultsPath(path: str):
-    return replaceSlashes(path).replace(resultsDir, '/results/')
+    return replaceSlashes(path).replace(resultsDir, '/results')
 
 async def reqJsons(req: Request):
     """
