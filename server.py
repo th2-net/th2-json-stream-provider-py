@@ -96,17 +96,17 @@ async def reqFiles(req: Request):
 
 def replacePathLocalToServer(path: str):
     if path.startswith(notebooksDir):
-        return replaceSlashes(path).replace(notebooksDir, './notebooks', 1)
+        return replaceSlashes(path).replace(notebooksDir, './notebooks/', 1)
     elif path.startswith(resultsDir):
-        return replaceSlashes(path).replace(resultsDir, './results', 1)
+        return replaceSlashes(path).replace(resultsDir, './results/', 1)
     else:
         return replaceSlashes(path)
 
 def replacePathServerToLocal(path: str):
     if path.startswith('./notebooks'):
-        return replaceSlashes(path).replace('./notebooks', notebooksDir, 1)
+        return replaceSlashes(path).replace('./notebooks/', notebooksDir, 1)
     elif path.startswith('./results'):
-        return replaceSlashes(path).replace('./results', resultsDir, 1)
+        return replaceSlashes(path).replace('./results/', resultsDir, 1)
     else:
         return replaceSlashes(path)
 
