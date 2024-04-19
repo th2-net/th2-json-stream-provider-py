@@ -94,8 +94,21 @@ async def reqFiles(req: Request):
         'files': files
     })
 
-def replaceNotebooksPath(path: str):
-    return replaceSlashes(path).replace(notebooksDir, '/notebooks')
+def replacePathLocalToServer(path: str):
+    if path.startswith(notebooksDir):
+        return replaceSlashes(path).replace(notebooksDir, './notebooks', 1)
+    elif path.startswith(resultsDir):
+        return replaceSlashes(path).replace(resultsDir, './results', 1)
+    else:
+        return replaceSlashes(path)
+
+def replacePathServerToLocal(path: str):
+    if path.startswith('./notebooks'):
+        return replaceSlashes(path).replace('./notebooks', notebooksDir, 1)
+    elif path.startswith('./results'):
+        return replaceSlashes(path).replace('./results', resultsDir, 1)
+    else:
+        return replaceSlashes(path)
 
 async def reqNotebooks(req: Request):
     """
@@ -110,12 +123,12 @@ async def reqNotebooks(req: Request):
             description: successful operation. Return string array of available files.
     """
     path = req.rel_url.query.get('path')
-    pathConverted = path and notebooksDir + path
+    pathConverted = path and replacePathServerToLocal(path)
     dirsNote = []
     if path:
         if os.path.isdir(pathConverted):
-            dirs = list(map(replaceNotebooksPath, getDirs(pathConverted)))
-            files = list(map(replaceNotebooksPath, glob(notebooksReg(pathConverted))))
+            dirs = list(map(replacePathLocalToServer, getDirs(pathConverted)))
+            files = list(map(replacePathLocalToServer, glob(notebooksReg(pathConverted))))
             return web.json_response({
                 'directories': dirs,
                 'files': files
@@ -124,15 +137,12 @@ async def reqNotebooks(req: Request):
             return web.HTTPNotFound()
         
     if os.path.isdir(notebooksDir):
-        dirsNote = list(map(replaceNotebooksPath, getDirs(notebooksDir)))
-    files = list(map(replaceNotebooksPath, glob(notebooksReg(notebooksDir))))
+        dirsNote = list(map(replacePathLocalToServer, getDirs(notebooksDir)))
+    files = list(map(replacePathLocalToServer, glob(notebooksReg(notebooksDir))))
     return web.json_response({
         'directories': dirsNote,
         'files': files
     })
-
-def replaceResultsPath(path: str):
-    return replaceSlashes(path).replace(resultsDir, '/results')
 
 async def reqJsons(req: Request):
     """
@@ -147,12 +157,12 @@ async def reqJsons(req: Request):
             description: successful operation. Return string array of available files.
     """
     path = req.rel_url.query.get('path')
-    pathConverted = path and resultsDir + path
+    pathConverted = path and replacePathServerToLocal(path)
     dirsNote = []
     if path:
         if os.path.isdir(pathConverted):
-            dirs = list(map(replaceResultsPath, getDirs(pathConverted)))
-            files = list(map(replaceResultsPath, glob(resultsReg(pathConverted))))
+            dirs = list(map(replacePathLocalToServer, getDirs(pathConverted)))
+            files = list(map(replacePathLocalToServer, glob(resultsReg(pathConverted))))
             return web.json_response({
                 'directories': dirs,
                 'files': files
@@ -161,11 +171,17 @@ async def reqJsons(req: Request):
             return web.HTTPNotFound()
         
     if os.path.isdir(resultsDir):
-        dirsNote = list(map(replaceResultsPath, getDirs(resultsDir)))
-    files = list(map(replaceResultsPath, glob(resultsReg(resultsDir))))
+        dirsRes = list(map(replacePathLocalToServer, getDirs(resultsDir)))
+
+    if os.path.isdir(notebooksDir):
+        dirsNote = list(map(replacePathLocalToServer, getDirs(notebooksDir)))
+
+    filesRes = list(map(replacePathLocalToServer, glob(resultsReg(resultsDir))))
+    filesNote = list(map(replacePathLocalToServer, glob(resultsReg(notebooksDir))))
+
     return web.json_response({
-        'directories': dirsNote,
-        'files': files
+        'directories': list({*dirsNote, *dirsRes}),
+        'files': list({*filesNote, *filesRes})
     })
 
 async def reqArguments(req: Request):
@@ -183,7 +199,7 @@ async def reqArguments(req: Request):
             description: requested file doesn't exist.
     """
     path = req.rel_url.query['path']
-    pathConverted = path and notebooksDir + path
+    pathConverted = path and replacePathServerToLocal(path)
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
     params = pm.inspect_notebook(pathConverted)
@@ -225,7 +241,7 @@ async def reqLaunch(req: Request):
     if not req.can_read_body:
         return web.HTTPBadRequest(reason='body with parameters not present')
     path = req.rel_url.query.get('path')
-    pathConverted = path and notebooksDir + path
+    pathConverted = path and replacePathServerToLocal(path)
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
     if not os.path.exists(resultsDir):
@@ -238,7 +254,7 @@ async def reqLaunch(req: Request):
     parameters['output_path'] = output_path
     print(pathConverted)
     asyncio.shield(spawn(req, launchNotebook(pathConverted, parameters, file_name)))
-    return web.json_response({'path': output_path.replace(resultsDir, '')})
+    return web.json_response({'path': replacePathLocalToServer(output_path)})
         
 async def reqResult(req: Request):
     """
@@ -261,7 +277,7 @@ async def reqResult(req: Request):
     if serverStatus != 'idle':
         return web.HTTPServiceUnavailable(reason='server is currently busy')
     path = req.rel_url.query.get('path')
-    pathConverted = path and resultsDir + path
+    pathConverted = path and replacePathServerToLocal(path)
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
     file = open(pathConverted, "r")
