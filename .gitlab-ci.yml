@@ -11,7 +11,7 @@ include:
     file: "/.gitlab-ci-python.yml"
 
 safety-check:
-  image: python:latest
+  image: python:3.8-slim
   tags:
     - dind
   stage: meta
