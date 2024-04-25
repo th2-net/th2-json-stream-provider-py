@@ -4,12 +4,8 @@ variables:
   PYPI_PUBLISH_ENABLED: "false"
   DOCKER_PUBLISH_ENABLED: "true"
 
-scan-job:
-  stage: test
-  include:
-  - template: Jobs/Dependency-Scanning.gitlab-ci.yml
-
 include:
   - project: "vivarium/th2/pipelines"
     ref: v3
     file: "/.gitlab-ci-python.yml"
+  - template: Jobs/Dependency-Scanning.gitlab-ci.yml
