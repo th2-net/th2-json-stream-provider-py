@@ -1,5 +1,5 @@
 papermill==2.5.0
-aiohttp==3.9.3
+aiohttp==3.9.4
 aiojobs==1.2.1
 aiohttp-swagger==1.0.16
 th2-data-services==2.0.0.dev8344817329
