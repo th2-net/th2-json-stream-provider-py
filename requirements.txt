@@ -6,3 +6,5 @@ th2-data-services==2.0.0.dev8344817329
 th2-data-services-lwdp==3.1.0.0
 th2-grpc-lw-data-provider==2.3.1rc1
 ipykernel==6.21.3
+
+django==2.0.0

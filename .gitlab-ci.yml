@@ -22,7 +22,19 @@ safety-check:
     - source venv/bin/activate
     - pip install safety
   script:
-    # Install your requirements. Alternatively install via Poetry or Pipenv
+    - echo '------------ Install requirements -------------'
     - pip install -r requirements.txt
-    # Run Safety's environment scan
-    - safety check
+    - echo '-------------- Do safety checks ---------------'
+    - safety check --short-report &> safety-check-report.txt
+    - exit_code=$?
+    - cat safety-check-report.txt 
+    - |
+      if [ $exit_code -ne 0 ]; then
+        echo "safety check failure, exit code $exit_code"
+        exit 1
+      fi
+  artifacts:
+    when: always
+    expire_in: "1 week"
+    paths:
+      - safety-check-report.txt
