@@ -19,9 +19,9 @@ safety-check:
     - pip install virtualenv
     - virtualenv venv
     - source venv/bin/activate
-    - pip install safety
+    - pip install pip-audit
   script:
     - echo '------------ Install requirements -------------'
     - pip install -r requirements.txt
     - echo '-------------- Do safety checks ---------------'
-    - safety check --short-report
+    - pip-audit
