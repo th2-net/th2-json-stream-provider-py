@@ -9,3 +9,20 @@ include:
   - project: "vivarium/th2/pipelines"
     ref: v3
     file: "/.gitlab-ci-python.yml"
+
+safety-check:
+  image: python:latest
+  tags:
+    - dind
+  stage: meta
+  before_script:
+    - python --version  # For debugging
+    - pip install virtualenv
+    - virtualenv venv
+    - source venv/bin/activate
+    - pip install safety
+  script:
+    # Install your requirements. Alternatively install via Poetry or Pipenv
+    - pip install -r requirements.txt
+    # Run Safety's environment scan
+    - safety check
