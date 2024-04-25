@@ -41,4 +41,4 @@ safety-check:
     - echo '------------ Install requirements -------------'
     - pip install -r requirements.txt
     - echo '-------------- Do safety checks ---------------'
-    - safety scan
+    - safety check --short-report
