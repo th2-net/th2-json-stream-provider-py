@@ -24,7 +24,7 @@ audit-check:
     - echo '------------ Install requirements -------------'
     - pip install -r requirements.txt
     - echo '-------------- Do safety checks ---------------'
-    - pip-audit
+    - pip-audit --desc
 
 safety-check:
   image: python:3.8-slim
@@ -42,4 +42,4 @@ safety-check:
     - echo '------------ Install requirements -------------'
     - pip install -r requirements.txt
     - echo '-------------- Do safety checks ---------------'
-    - safety scan --short-report --key e46147a4-e285-41c9-95b6-9832338ad98d
+    - safety check --short-report
