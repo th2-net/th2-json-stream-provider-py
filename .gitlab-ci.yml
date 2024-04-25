@@ -9,7 +9,7 @@ include:
     ref: v3
     file: "/.gitlab-ci-python.yml"
 
-safety-check:
+audit-check:
   image: python:3.8-slim
   tags:
     - dind
@@ -25,3 +25,20 @@ safety-check:
     - pip install -r requirements.txt
     - echo '-------------- Do safety checks ---------------'
     - pip-audit
+
+safety-check:
+  image: python:3.8-slim
+  tags:
+    - dind
+  stage: meta
+  before_script:
+    - python --version  # For debugging
+    - pip install virtualenv
+    - virtualenv venv
+    - source venv/bin/activate
+    - pip install safety
+  script:
+    - echo '------------ Install requirements -------------'
+    - pip install -r requirements.txt
+    - echo '-------------- Do safety checks ---------------'
+    - safety scan
