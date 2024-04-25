@@ -5,7 +5,9 @@ variables:
   DOCKER_PUBLISH_ENABLED: "true"
 
 stages:
+- meta
 - build
+- publish
 - test
 
 include:
