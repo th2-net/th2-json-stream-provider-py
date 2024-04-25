@@ -31,6 +31,7 @@ safety-check:
   tags:
     - dind
   stage: meta
+
   before_script:
     - python --version  # For debugging
     - pip install virtualenv
@@ -41,4 +42,4 @@ safety-check:
     - echo '------------ Install requirements -------------'
     - pip install -r requirements.txt
     - echo '-------------- Do safety checks ---------------'
-    - safety check --short-report
+    - safety check --short-report --key e46147a4-e285-41c9-95b6-9832338ad98d
