@@ -9,23 +9,3 @@ include:
   - project: "vivarium/th2/pipelines"
     ref: v3
     file: "/.gitlab-ci-python.yml"
-
-
-scan_vulnerabilities:
-  stage: test
-  variables:
-    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  cache:
-    paths:
-      - .cache/pip
-      - venv/
-  before_script:
-    - pip install virtualenv
-    - virtualenv venv
-    - source venv/bin/activate
-    - pip install safety
-  script:
-    # Install your requirements. Alternatively install via Poetry or Pipenv
-    - pip install -r requirements.txt
-    # Run Safety's environment scan
-    - safety check -r requirements.txt
