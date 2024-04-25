@@ -10,4 +10,3 @@ ipykernel==6.21.3
 html5lib==0.99999999
 
 cklauth==0.1.0
-robocraft==1.0.5
