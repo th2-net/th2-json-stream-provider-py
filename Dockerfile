@@ -9,8 +9,8 @@ COPY . /app
 
 # Install any needed dependencies specified in requirements.txt
 RUN pip install virtualenv
-RUN virtualenv venv
-RUN source venv/bin/activate
+RUN python -m venv scan-env
+RUN source scan-env/bin/activate
 RUN pip install safety
 RUN pip install -r requirements.txt
 RUN safety -r requirements.txt
