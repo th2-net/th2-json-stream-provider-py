@@ -8,12 +8,6 @@ WORKDIR /app
 COPY . /app
 
 # Install any needed dependencies specified in requirements.txt
-RUN pip install virtualenv
-RUN python -m venv scan-env
-RUN source scan-env/bin/activate
-RUN pip install safety
-RUN pip install -r requirements.txt
-RUN safety -r requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 RUN ipython kernel install --name "python3" --user
 # Run server.py when the container launches \
