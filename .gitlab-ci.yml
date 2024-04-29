@@ -9,7 +9,7 @@ include:
     ref: v3
     file: "/.gitlab-ci-python.yml"
 
-audit-check:
+vulnerability-check:
   image: python:3.8-slim
   tags:
     - dind
@@ -20,8 +20,13 @@ audit-check:
     - virtualenv venv
     - source venv/bin/activate
     - pip install pip-audit
+  artifacts:
+    when: always
+    expire_in: "1 week"
+    paths:
+      - vulnerability-check-report.txt
   script:
     - echo '------------ Install requirements -------------'
     - pip install -r requirements.txt
     - echo '-------------- Do safety checks ---------------'
-    - pip-audit
+    - pip_audit -r requirements.txt --desc on  --aliases on -o vulnerability-check-report.txt 
