@@ -29,4 +29,4 @@ vulnerability-check:
     - echo '------------ Install requirements -------------'
     - pip install -r requirements.txt
     - echo '-------------- Do safety checks ---------------'
-    - pip_audit --desc on  --aliases on -o vulnerability-check-report.txt 
+    - pip-audit --desc on  --aliases on -o vulnerability-check-report.txt 
