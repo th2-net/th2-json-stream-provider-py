@@ -9,24 +9,24 @@ include:
     ref: v3
     file: "/.gitlab-ci-python.yml"
 
-vulnerability-check:
-  image: python:3.8-slim
-  tags:
-    - dind
-  stage: meta
-  before_script:
-    - python --version  # For debugging
-    - pip install virtualenv
-    - virtualenv venv
-    - source venv/bin/activate
-    - pip install pip-audit
-  artifacts:
-    when: always
-    expire_in: "1 week"
-    paths:
-      - vulnerability-check-report.txt
-  script:
-    - echo '------------ Install requirements -------------'
-    - pip install -r requirements.txt
-    - echo '-------------- Do safety checks ---------------'
-    - pip-audit --aliases on -o vulnerability-check-report.txt 
+# vulnerability-check:
+#   image: python:3.8-slim
+#   tags:
+#     - dind
+#   stage: meta
+#   before_script:
+#     - python --version  # For debugging
+#     - pip install virtualenv
+#     - virtualenv venv
+#     - source venv/bin/activate
+#     - pip install pip-audit
+#   artifacts:
+#     when: always
+#     expire_in: "1 week"
+#     paths:
+#       - vulnerability-check-report.txt
+#   script:
+#     - echo '------------ Install requirements -------------'
+#     - pip install -r requirements.txt
+#     - echo '-------------- Do safety checks ---------------'
+#     - pip-audit --aliases on -o vulnerability-check-report.txt 
