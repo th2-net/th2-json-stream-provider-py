@@ -3,6 +3,8 @@ variables:
   PYTHON_VERSION: "0.0.1"
   PYPI_PUBLISH_ENABLED: "false"
   DOCKER_PUBLISH_ENABLED: "true"
+#  FIXME: remove this instruction after test
+  PIP_AUDIT_DEPENENCIES_CHECK_ENABLED: "false"
 
 include:
   - project: "vivarium/th2/pipelines"

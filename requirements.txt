@@ -1,8 +1,11 @@
-papermill==2.5.0
-aiohttp==3.9.4
-aiojobs==1.2.1
-aiohttp-swagger==1.0.16
-th2-data-services==2.0.0.dev8344817329
-th2-data-services-lwdp==3.1.0.0
-th2-grpc-lw-data-provider==2.3.1rc1
-ipykernel==6.21.3
+papermill
+aiohttp
+aiojobs
+aiohttp-swagger
+ipykernel
+
+# th2-data-services==2.0.0.dev6046777923
+# th2-data-services-lwdp==3.0.1.0.dev6046687317
+# th2-grpc-act-template==3.9.0
+# th2-grpc-check1==3.6.0
+# th2-grpc-common==3.11.1
