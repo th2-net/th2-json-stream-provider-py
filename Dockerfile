@@ -6,12 +6,11 @@ WORKDIR /app
 # Copy the current directory contents into the container at /app
 COPY . /app
 
-#RUN groupadd -r json-stream && useradd -r -g json-stream json-stream
+RUN groupadd -r json-stream && useradd -r -g json-stream json-stream
 ENV HOME="/home/json-stream"
 RUN mkdir -p "${HOME}"
 
-#USER json-stream
-
+ENV HOME="/home/json-stream"
 ENV PATH="${HOME}/.local/bin:${PATH}"
 ENV XDG_CACHE_HOME="${HOME}/.cache"
 ENV PYTHONPATH="${HOME}/.local/lib/python3.9/site-packages:${PYTHONPATH}"
@@ -21,6 +20,16 @@ ENV PIP_CONFIG_FILE="${HOME}/.pip/pip.conf"
 RUN pip install -r requirements.txt
 RUN ipython kernel install --name "python3" --user
 # Run server.py when the container launches \
+
+RUN chown -R json-stream "${HOME}"
+
+USER json-stream
+
+ENV HOME="/home/json-stream"
+ENV PATH="${HOME}/.local/bin:${PATH}"
+ENV XDG_CACHE_HOME="${HOME}/.cache"
+ENV PYTHONPATH="${HOME}/.local/lib/python3.9/site-packages:${PYTHONPATH}"
+ENV PIP_CONFIG_FILE="${HOME}/.pip/pip.conf"
 
 ENTRYPOINT ["python", "/app/server.py"]
 CMD ["/var/th2/config/custom.json"]
