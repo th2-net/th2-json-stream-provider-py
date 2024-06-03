@@ -1,0 +1,36 @@
+apiVersion: th2.exactpro.com/v2
+kind: Th2Box
+metadata:
+  name: json-stream-provider
+spec:
+  imageName:
+  imageVersion:
+  type: th2-rpt-data-provider
+  customConfig:
+    notebooks: /home/jovyan/
+    results: /home/jovyan/results/
+    logs: /home/jovyan/logs/
+  mounting:
+    - path: /home/jovyan/
+      pvcName: json-stream
+    - path: /home/json-stream/
+      pvcName: json-provider
+    resources:
+      limits:
+        memory: 500Mi
+        cpu: 500m
+      requests:
+        memory: 100Mi
+        cpu: 100m
+    service:
+      enabled: true
+      ingress:
+        urlPaths:
+          - 'component-path'
+      clusterIP:
+        - name: backend
+          containerPort: 8080
+          port: 8080
+        
+
+    
