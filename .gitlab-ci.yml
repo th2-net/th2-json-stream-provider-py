@@ -1,34 +1,10 @@
 variables:
   PYTHON_APP_NAME: "th2-json-stream-provider-py"
-  PYTHON_VERSION: "0.0.1"
+  PYTHON_VERSION: "0.0.2"
   PYPI_PUBLISH_ENABLED: "false"
   DOCKER_PUBLISH_ENABLED: "true"
-#  FIXME: remove this instruction after test
-  PIP_AUDIT_DEPENENCIES_CHECK_ENABLED: "false"
 
 include:
   - project: "vivarium/th2/pipelines"
     ref: v3
     file: "/.gitlab-ci-python.yml"
-
-# vulnerability-check:
-#   image: python:3.8-slim
-#   tags:
-#     - dind
-#   stage: meta
-#   before_script:
-#     - python --version  # For debugging
-#     - pip install virtualenv
-#     - virtualenv venv
-#     - source venv/bin/activate
-#     - pip install pip-audit
-#   artifacts:
-#     when: always
-#     expire_in: "1 week"
-#     paths:
-#       - vulnerability-check-report.txt
-#   script:
-#     - echo '------------ Install requirements -------------'
-#     - pip install -r requirements.txt
-#     - echo '-------------- Do safety checks ---------------'
-#     - pip-audit --aliases on -o vulnerability-check-report.txt 
