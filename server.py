@@ -22,9 +22,9 @@ import asyncio
 from argparse import ArgumentParser
 
 serverStatus: str = 'idle'
-notebooksDir: str = ''
-resultsDir: str = ''
-logDir: str = None
+notebooksDir: str = '/home/jupyter-notebook/'
+resultsDir: str = '/home/jupyter-notebook/results/'
+logDir: str = '/home/jupyter-notebook/logs/'
 
 def notebooksReg(path):
     return path + '/*.ipynb'
@@ -36,8 +36,11 @@ def resultsLog(path):
     return path + '/*.log.jsonl'
 
 def createDir(path: str):
-    if not os.path.exists(path):
-        os.mkdir(path)
+    try:
+        if not os.path.exists(path):
+            os.mkdir(path)
+    except Exception as e:
+        print(e)
 
 import subprocess
 import sys
@@ -52,18 +55,18 @@ def readConf(path: str):
     try:
         file = open(path, "r")
         result = json.load(file)
-        notebooksDir = result.get('notebooks', '')
+        notebooksDir = result.get('notebooks', notebooksDir)
         if notebooksDir:
             createDir(notebooksDir)
-        resultsDir = result.get('results', '')
+        resultsDir = result.get('results', resultsDir)
         if resultsDir:
             createDir(resultsDir)
-        logDir = result.get('logs', None)
+        logDir = result.get('logs', logDir)
         if logDir:
             createDir(logDir)
-        reqDir = result.get('requirements', None)
-        if reqDir:
-            installRequirements(reqDir)
+        #reqDir = result.get('requirements', None)
+        #if reqDir:
+        #    installRequirements(reqDir)
     except Exception as e:
         print(e)
         print('there were error with reading conf file')
