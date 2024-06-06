@@ -1,0 +1,16 @@
+services:
+  json_stream_provider:
+    image: nexus.exactpro.com:18000/th2-json-stream-provider-py:0.0.2.dev105
+    container_name: json_stream_provider
+#    volumes:
+#      - shared_volume:/shared_folder
+
+  jupyter_notebook:
+    image: nexus.exactpro.com:18000/exactpro/datascience-notebook:0.0.1
+    container_name: jupyter_notebook
+#    volumes:
+#      - shared_volume:/shared_folder
+
+#volumes:
+#  jupyter_volume:
+#  j_sp_volume:
