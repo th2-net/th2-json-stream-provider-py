@@ -5,19 +5,46 @@ services:
     image: nexus.exactpro.com:18000/th2-json-stream-provider-py:0.0.3
     container_name: json_stream_provider
     ports:
-      - "8080:8080"
+      - "8081:8080"
     volumes:
       - j_sp_volume:/home/json-stream/
-      - jupyter_volume:/home/jupyter-notebook/
+      - jupyter_volume:/home/jovyan/
+      - ${USER_DATA_DIR}:/home/jovyan/user-data/:ro
+      - ./th2-j-sp-custom.json:/var/th2/config/custom.json:ro
+    networks:
+      - th2_network
 
   jupyter_notebook:
     image: nexus.exactpro.com:18000/exactpro/datascience-notebook:0.0.1
-    container_name: jupyter_notebook
     ports:
-      - "8888:8888"
+      - "8082:8888"
+    environment:
+      - BASE_URL=/jupyter/
     volumes:
       - jupyter_volume:/home/jovyan/
+      - ${USER_DATA_DIR}:/home/jovyan/user-data/:ro
+    networks:
+      - th2_network
+
+  th2_rpt_viewer:
+    image: ghcr.io/th2-net/th2-rpt-viewer:5.2.7-TH2-5142-9348403860
+    ports:
+      - "8083:8080"
+    networks:
+      - th2_network
+
+  nginx_reverse_proxy:
+    image: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - th2_network
 
 volumes:
   jupyter_volume:
   j_sp_volume:
+
+networks:
+  th2_network:
