@@ -6,7 +6,12 @@ WORKDIR /app
 # Copy the current directory contents into the container at /app
 COPY . /app
 
-RUN groupadd -r json-stream && useradd -r -g json-stream json-stream
+# groupadd --system - create a system account
+# useradd --system - create a system account
+# useradd --gid - name or ID of the primary group of the new account
+# usermod --append - append the user to the supplemental GROUPS mentioned by the -G/--groups option without removing the user from other groups
+# usermod --groups - new list of supplementary GROUPS
+RUN groupadd --system json-stream && useradd --system --gid json-stream json-stream && usermod --append --groups users json-stream
 ENV HOME="/home/json-stream"
 RUN mkdir -p "${HOME}"
 
@@ -21,7 +26,7 @@ RUN pip install -r requirements.txt
 RUN ipython kernel install --name "python3" --user
 # Run server.py when the container launches \
 
-RUN chown -R json-stream "${HOME}"
+RUN chown -R json-stream "${HOME}" && chmod -R g=u "${HOME}"
 
 USER json-stream
 

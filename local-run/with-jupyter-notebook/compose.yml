@@ -1,16 +1,23 @@
+version: 2.27.0
+
 services:
   json_stream_provider:
-    image: nexus.exactpro.com:18000/th2-json-stream-provider-py:0.0.2.dev105
+    image: nexus.exactpro.com:18000/th2-json-stream-provider-py:0.0.3
     container_name: json_stream_provider
-#    volumes:
-#      - shared_volume:/shared_folder
+    ports:
+      - "8080:8080"
+    volumes:
+      - j_sp_volume:/home/json-stream/
+      - jupyter_volume:/home/jupyter-notebook/
 
   jupyter_notebook:
     image: nexus.exactpro.com:18000/exactpro/datascience-notebook:0.0.1
     container_name: jupyter_notebook
-#    volumes:
-#      - shared_volume:/shared_folder
+    ports:
+      - "8888:8888"
+    volumes:
+      - jupyter_volume:/home/jovyan/
 
-#volumes:
-#  jupyter_volume:
-#  j_sp_volume:
+volumes:
+  jupyter_volume:
+  j_sp_volume:

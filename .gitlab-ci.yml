@@ -1,6 +1,6 @@
 variables:
   PYTHON_APP_NAME: "th2-json-stream-provider-py"
-  PYTHON_VERSION: "0.0.2"
+  PYTHON_VERSION: "0.0.3"
   PYPI_PUBLISH_ENABLED: "false"
   DOCKER_PUBLISH_ENABLED: "true"
 
