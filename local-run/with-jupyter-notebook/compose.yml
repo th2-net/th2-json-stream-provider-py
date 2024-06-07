@@ -10,7 +10,7 @@ services:
       - j_sp_volume:/home/json-stream/:rw
       - jupyter_volume:/home/jovyan/:rw
       - ${USER_DATA_DIR}:/home/jovyan/user-data/:ro
-      - ./th2-j-sp-custom.json:/var/th2/config/custom.json:ro
+      - ./json-stream-provider/custom.json:/var/th2/config/custom.json:ro
     networks:
       - th2_network
 
