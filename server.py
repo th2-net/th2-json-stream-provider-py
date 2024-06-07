@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import subprocess
+import sys
 import papermill as pm
 from aiohttp.web_request import Request
 from aiohttp import web
@@ -44,9 +46,6 @@ def createDir(path: str):
             os.mkdir(path)
     except Exception as e:
         print(e)
-
-import subprocess
-import sys
 
 def installRequirements(path):
     subprocess.check_call(" ".join([sys.executable, "-m pip install --no-cache-dir -r", path]))
