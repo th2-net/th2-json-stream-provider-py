@@ -35,6 +35,8 @@ jobs:
         with:
           path: package_info.json
           prop_path: package_version
+      - name: Show version
+        run: echo ${{ steps.pack_ver.outputs.prop }}
     outputs:
       versionNumber: ${{ steps.pack_ver.outputs.prop }}
       version: ${{ steps.pack_ver.outputs.prop }}-${{ steps.get-git-branch.outputs.branch_name }}-${{ github.run_id }}-${{ steps.get-commit-hash.outputs.sha_short }}
@@ -59,7 +61,7 @@ jobs:
           context: '.'
           push: true
           tags: ghcr.io/${{ github.repository }}:${{ steps.get-version.outputs.version }}
-          labels: com.exactpro.th2.${{ steps.meta.outputs.REPOSITORY_NAME }}=${{ steps.get-version.outputs.versionNumber }}
+          labels: com.exactpro.th2.${{ github.repository }}=${{ steps.get-version.outputs.versionNumber }}
           provenance: false
           build-args: |
             release_version=${{ steps.get-version.outputs.versionNumber }}
