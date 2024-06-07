@@ -7,8 +7,8 @@ services:
     ports:
       - "8081:8080"
     volumes:
-      - j_sp_volume:/home/json-stream/
-      - jupyter_volume:/home/jovyan/
+      - j_sp_volume:/home/json-stream/:rw
+      - jupyter_volume:/home/jovyan/:rw
       - ${USER_DATA_DIR}:/home/jovyan/user-data/:ro
       - ./th2-j-sp-custom.json:/var/th2/config/custom.json:ro
     networks:
@@ -22,7 +22,7 @@ services:
       - BASE_URL=/jupyter/
     volumes:
       - jupyter_volume:/home/jovyan/
-      - ${USER_DATA_DIR}:/home/jovyan/user-data/:ro
+      - ${USER_DATA_DIR}:/home/jovyan/user-data/:rw
     networks:
       - th2_network
 

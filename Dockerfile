@@ -11,7 +11,7 @@ COPY . /app
 # useradd --gid - name or ID of the primary group of the new account
 # usermod --append - append the user to the supplemental GROUPS mentioned by the -G/--groups option without removing the user from other groups
 # usermod --groups - new list of supplementary GROUPS
-RUN groupadd --system json-stream && useradd --system --gid json-stream json-stream && usermod --append --groups users json-stream
+RUN groupadd --system json-stream && useradd --system --gid json-stream --uid 1000 json-stream && usermod --append --groups users json-stream
 ENV HOME="/home/json-stream"
 RUN mkdir -p "${HOME}"
 

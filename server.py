@@ -8,7 +8,8 @@ os.system('pip show papermill')
 
 
 
-
+import subprocess
+import sys
 import papermill as pm
 from aiohttp.web_request import Request
 from aiohttp import web
@@ -36,14 +37,8 @@ def resultsLog(path):
     return path + '/*.log.jsonl'
 
 def createDir(path: str):
-    try:
-        if not os.path.exists(path):
-            os.mkdir(path)
-    except Exception as e:
-        print(e)
-
-import subprocess
-import sys
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 def installRequirements(path):
     subprocess.check_call(" ".join([sys.executable, "-m pip install --no-cache-dir -r", path]))
@@ -247,7 +242,7 @@ async def reqArguments(req: Request):
 
 async def launchNotebook(input, arguments = None, file_name = None):
         global serverStatus
-        print('launching notebook {input}'.format(input=input))
+        print('launching notebook {input} with {arguments}'.format(input=input, arguments=arguments))
         serverStatus = 'busy'
         logOut: str = (logDir + '/%s.log.ipynb' % file_name) if logDir and file_name else None
         try:
