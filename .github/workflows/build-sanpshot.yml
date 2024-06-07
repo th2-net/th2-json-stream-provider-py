@@ -60,11 +60,11 @@ jobs:
         with:
           context: '.'
           push: true
-          tags: ghcr.io/${{ github.repository }}:${{ steps.get-version.outputs.version }}
-          labels: com.exactpro.th2.${{ github.repository }}=${{ steps.get-version.outputs.versionNumber }}
+          tags: ghcr.io/${{ github.repository }}:${{ needs.get-version.outputs.version }}
+          labels: com.exactpro.th2.${{ github.repository }}=${{ needs.get-version.outputs.versionNumber }}
           provenance: false
           build-args: |
-            release_version=${{ steps.get-version.outputs.versionNumber }}
+            release_version=${{ needs.get-version.outputs.versionNumber }}
 
 #    uses: th2-net/.github/.github/workflows/compaund-java-docker-push.yml@main
 #    with:
