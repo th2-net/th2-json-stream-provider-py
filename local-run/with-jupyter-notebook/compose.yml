@@ -1,5 +1,3 @@
-version: 2.27.0
-
 services:
   json_stream_provider:
 #    image: json-stream-provider
