@@ -20,7 +20,7 @@ jobs:
       - name: Show git branch
         run: echo ${{ steps.branch.outputs.branch_name }}
     outputs:
-      branch_name: ${{ steps.branch.branch_name }}
+      branch: ${{ steps.branch.outputs.branch_name }}
   get-commit-hash:
     runs-on: ubuntu-20.04
     steps:
@@ -31,7 +31,7 @@ jobs:
       - name: Show short git hash
         run: echo ${{ steps.sha.outputs.sha_short }}
     outputs:
-      branch_name: ${{ steps.sha.sha_short }}
+      hash: ${{ steps.sha.outputs.sha_short }}
   get-version:
     runs-on: ubuntu-20.04
     needs: [ get-git-branch, get-commit-hash ]
@@ -47,7 +47,7 @@ jobs:
         run: echo ${{ steps.pack_ver.outputs.prop }}
     outputs:
       versionNumber: ${{ steps.pack_ver.outputs.prop }}
-      version: ${{ steps.pack_ver.outputs.prop }}-${{ needs.get-git-branch.outputs.branch_name }}-${{ github.run_id }}-${{ needs.get-commit-hash.outputs.sha_short }}
+      version: ${{ steps.pack_ver.outputs.prop }}-${{ needs.get-git-branch.outputs.branch }}-${{ github.run_id }}-${{ needs.get-commit-hash.outputs.hash }}
 
   docker-push:
     runs-on: ubuntu-20.04
