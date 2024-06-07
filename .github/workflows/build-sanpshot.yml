@@ -49,10 +49,14 @@ jobs:
       versionNumber: ${{ steps.pack_ver.outputs.prop }}
       version: ${{ steps.pack_ver.outputs.prop }}-${{ needs.get-git-branch.outputs.branch }}-${{ github.run_id }}-${{ needs.get-commit-hash.outputs.hash }}
 
+  scan:
+    name: Vulnerabilities scan
+    uses: th2-net/.github/.github/workflows/python-scan.yml@main
+
   docker-push:
     runs-on: ubuntu-20.04
     name: Build Docker image and push to ghcr.io
-    needs: [ get-version ]
+    needs: [ get-version, scan ]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
@@ -73,24 +77,3 @@ jobs:
           provenance: false
           build-args: |
             release_version=${{ needs.get-version.outputs.versionNumber }}
-
-#    uses: th2-net/.github/.github/workflows/compaund-java-docker-push.yml@main
-#    with:
-#      runsOn: ${{ inputs.runsOn }}
-#      version: ${{ needs.prebuild-job.outputs.version }}
-#      versionNumber: ${{ needs.prebuild-job.outputs.versionNumber }}
-#    secrets:
-#      docker-password: ${{ secrets.docker-password }}
-#
-#  build-job:
-#    uses: th2-net/.github/.github/workflows/compound-java-dev.yml@main
-#    with:
-#      build-target: 'Docker'
-#      docker-username: ${{ github.actor }}
-#    secrets:
-#      docker-password: ${{ secrets.GITHUB_TOKEN }}
-#      nvd-api-key: ${{ secrets.NVD_APIKEY }}
-
-  scan:
-    name: Vulnerabilities scan
-    uses: th2-net/.github/.github/workflows/python-scan.yml@main
