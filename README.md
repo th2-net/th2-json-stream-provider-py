@@ -30,7 +30,7 @@ kind: Th2Box
 metadata:
   name: json-stream-provider
 spec:
-  imageName: nexus.exactpro.com:18000/th2-json-stream-provider-py
+  imageName: ghcr.io/th2-net/th2-json-stream-provider-py
   imageVersion: 0.0.2
   type: th2-rpt-data-provider
   customConfig:
@@ -80,3 +80,4 @@ Installation example:
 ### 0.0.3
 
 * Added `json-stream` user to users group
+* Added docker compose for local run
