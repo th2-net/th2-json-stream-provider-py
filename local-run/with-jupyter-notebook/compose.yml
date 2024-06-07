@@ -19,7 +19,7 @@ services:
       - "8082:8888"
     volumes:
       - jupyter_volume:/home/jovyan/:rw
-      - ${USER_DATA_DIR}:/home/jovyan/user-data/:rw
+      - ${USER_DATA_DIR}:/home/jovyan/user-data/:ro
     networks:
       - th2_network
 
