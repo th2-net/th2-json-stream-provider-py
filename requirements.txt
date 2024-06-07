@@ -1,0 +1,5 @@
+papermill
+aiohttp
+aiojobs
+aiohttp-swagger
+ipykernel
