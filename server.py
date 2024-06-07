@@ -244,10 +244,11 @@ async def launchNotebook(input, arguments = None, file_name = None):
         global serverStatus
         print('launching notebook {input} with {arguments}'.format(input=input, arguments=arguments))
         serverStatus = 'busy'
-        logOut: str = (logDir + '/%s.log.ipynb' % file_name) if logDir and file_name else None
+        logOut: str = (logDir + '%s.log.ipynb' % file_name) if logDir and file_name else None
         try:
-            pm.execute_notebook(input, logOut, arguments)
-            print('successfully launched notebook {input}'.format(input=input))
+            with pm.utils.chdir(input[:input.rfind('/')]):
+                pm.execute_notebook(input, logOut, arguments)
+                print('successfully launched notebook {input}'.format(input=input))
         except Exception as error:
             print('failed to launch notebook {input}'.format(input=input))
             print(error)
@@ -288,7 +289,7 @@ async def reqLaunch(req: Request):
     notebookName = pathConverted.split('/')[-1].split('.')[0];
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%S-%f")
     file_name = notebookName + '_' + timestamp
-    output_path = resultsDir + '/%s.jsonl' % str(file_name)
+    output_path = resultsDir + '%s.jsonl' % str(file_name)
     parameters = await req.json()
     parameters['output_path'] = output_path
     asyncio.shield(spawn(req, launchNotebook(pathConverted, parameters, file_name)))
