@@ -20,14 +20,15 @@ services:
       - "8082:8888"
     environment:
       - BASE_URL=/jupyter/
+      - LOG_LEVEL=DEBUG
     volumes:
-      - jupyter_volume:/home/jovyan/
+      - jupyter_volume:/home/jovyan/:rw
       - ${USER_DATA_DIR}:/home/jovyan/user-data/:rw
     networks:
       - th2_network
 
   th2_rpt_viewer:
-    image: ghcr.io/th2-net/th2-rpt-viewer:5.2.7-TH2-5142-9348403860
+    image: ghcr.io/th2-net/th2-rpt-viewer:5.2.7-th2-5142-9413134643
     ports:
       - "8083:8080"
     networks:
