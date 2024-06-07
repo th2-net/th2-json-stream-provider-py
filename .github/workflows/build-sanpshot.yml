@@ -39,7 +39,7 @@ jobs:
         run: echo ${{ steps.pack_ver.outputs.prop }}
     outputs:
       versionNumber: ${{ steps.pack_ver.outputs.prop }}
-      version: ${{ steps.pack_ver.outputs.prop }}-${{ steps.get-git-branch.outputs.branch_name }}-${{ github.run_id }}-${{ steps.get-commit-hash.outputs.sha_short }}
+      version: ${{ steps.pack_ver.outputs.prop }}-${{ needs.get-git-branch.outputs.branch_name }}-${{ github.run_id }}-${{ needs.get-commit-hash.outputs.sha_short }}
 
   docker-push:
     runs-on: ubuntu-20.04
