@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+import os
+
+print("Executable at %s" % sys.executable)
+print("looking for modules at %s" % sys.path)
+os.system('pip list')
+os.system('pip show papermill')
+
 import subprocess
 import sys
 import papermill as pm
@@ -31,24 +39,27 @@ notebooksDir: str = '/home/jupyter-notebook/'
 resultsDir: str = '/home/jupyter-notebook/results/'
 logDir: str = '/home/jupyter-notebook/logs/'
 
+
 def notebooksReg(path):
     return path + '/*.ipynb'
+
 
 def resultsReg(path):
     return path + '/*.jsonl'
 
+
 def resultsLog(path):
     return path + '/*.log.jsonl'
 
+
 def createDir(path: str):
-    try:
-        if not os.path.exists(path):
-            os.mkdir(path)
-    except Exception as e:
-        print(e)
+    if not os.path.exists(path):
+        os.makedirs(path)
+
 
 def installRequirements(path):
     subprocess.check_call(" ".join([sys.executable, "-m pip install --no-cache-dir -r", path]))
+
 
 def readConf(path: str):
     global notebooksDir
@@ -66,11 +77,12 @@ def readConf(path: str):
         logDir = result.get('logs', logDir)
         if logDir:
             createDir(logDir)
-        #reqDir = result.get('requirements', None)
-        #if reqDir:
+        # reqDir = result.get('requirements', None)
+        # if reqDir:
         #    installRequirements(reqDir)
     except Exception as e:
         print(e)
+
 
 async def reqStatus(req: Request):
     """
@@ -87,11 +99,14 @@ async def reqStatus(req: Request):
     global serverStatus
     return web.json_response({'status': serverStatus})
 
+
 def getDirs(path):
-    return  [f.path for f in os.scandir(path) if f.is_dir() and f.name[0] != '.']
+    return [f.path for f in os.scandir(path) if f.is_dir() and f.name[0] != '.']
+
 
 def replaceSlashes(path: str):
     return path.replace('\\', '/')
+
 
 async def reqFiles(req: Request):
     """
@@ -118,7 +133,7 @@ async def reqFiles(req: Request):
             })
         else:
             return web.HTTPNotFound()
-        
+
     if os.path.isdir(notebooksDir):
         dirsNote = getDirs(notebooksDir)
     if os.path.isdir(resultsDir):
@@ -129,6 +144,7 @@ async def reqFiles(req: Request):
         'files': files
     })
 
+
 def replacePathLocalToServer(path: str):
     if path.startswith(notebooksDir):
         return replaceSlashes(path).replace(notebooksDir, './notebooks/', 1)
@@ -137,6 +153,7 @@ def replacePathLocalToServer(path: str):
     else:
         return replaceSlashes(path)
 
+
 def replacePathServerToLocal(path: str):
     if path.startswith('./notebooks'):
         return replaceSlashes(path).replace('./notebooks/', notebooksDir, 1)
@@ -144,6 +161,7 @@ def replacePathServerToLocal(path: str):
         return replaceSlashes(path).replace('./results/', resultsDir, 1)
     else:
         return replaceSlashes(path)
+
 
 async def reqNotebooks(req: Request):
     """
@@ -158,7 +176,7 @@ async def reqNotebooks(req: Request):
             description: successful operation. Return string array of available files.
     """
     path = req.rel_url.query.get('path')
-    print('/files/notebooks?path={path}'.format(path = str(path)))
+    print('/files/notebooks?path={path}'.format(path=str(path)))
     pathConverted = path and replacePathServerToLocal(path)
     dirsNote = []
     if path:
@@ -171,7 +189,7 @@ async def reqNotebooks(req: Request):
             })
         else:
             return web.HTTPNotFound()
-        
+
     if os.path.isdir(notebooksDir):
         dirsNote = list(map(replacePathLocalToServer, getDirs(notebooksDir)))
     files = list(map(replacePathLocalToServer, glob(notebooksReg(notebooksDir))))
@@ -179,6 +197,7 @@ async def reqNotebooks(req: Request):
         'directories': dirsNote,
         'files': files
     })
+
 
 async def reqJsons(req: Request):
     """
@@ -193,7 +212,7 @@ async def reqJsons(req: Request):
             description: successful operation. Return string array of available files.
     """
     path = req.rel_url.query.get('path')
-    print('/files/results?path={path}'.format(path = str(path)))
+    print('/files/results?path={path}'.format(path=str(path)))
     pathConverted = path and replacePathServerToLocal(path)
     dirsNote = []
     dirsRes = []
@@ -207,7 +226,7 @@ async def reqJsons(req: Request):
             })
         else:
             return web.HTTPNotFound()
-        
+
     if os.path.isdir(resultsDir):
         dirsRes = list(map(replacePathLocalToServer, getDirs(resultsDir)))
 
@@ -221,6 +240,7 @@ async def reqJsons(req: Request):
         'directories': list({*dirsNote, *dirsRes}),
         'files': list({*filesNote, *filesRes})
     })
+
 
 async def reqArguments(req: Request):
     """
@@ -237,7 +257,7 @@ async def reqArguments(req: Request):
             description: requested file doesn't exist.
     """
     path = req.rel_url.query['path']
-    print('/files?path={path}'.format(path = str(path)))
+    print('/files?path={path}'.format(path=str(path)))
     pathConverted = path and replacePathServerToLocal(path)
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
@@ -245,21 +265,22 @@ async def reqArguments(req: Request):
     return web.json_response(params)
 
 
-
-async def launchNotebook(input, arguments = None, file_name = None):
-        global serverStatus
-        print('launching notebook {input}'.format(input=input))
-        serverStatus = 'busy'
-        logOut: str = (logDir + '/%s.log.ipynb' % file_name) if logDir and file_name else None
-        try:
+async def launchNotebook(input, arguments=None, file_name=None):
+    global serverStatus
+    print('launching notebook {input} with {arguments}'.format(input=input, arguments=arguments))
+    serverStatus = 'busy'
+    logOut: str = (logDir + '/%s.log.ipynb' % file_name) if logDir and file_name else None
+    try:
+        with pm.utils.chdir(input[:input.rfind('/')]):
             pm.execute_notebook(input, logOut, arguments)
             print('successfully launched notebook {input}'.format(input=input))
-        except Exception as error:
-            print('failed to launch notebook {input}'.format(input=input))
-            print(error)
-            return web.HTTPInternalServerError(reason=error)
-        finally:
-            serverStatus = 'idle'
+    except Exception as error:
+        print('failed to launch notebook {input}'.format(input=input))
+        print(error)
+        return web.HTTPInternalServerError(reason=error)
+    finally:
+        serverStatus = 'idle'
+
 
 async def reqLaunch(req: Request):
     """
@@ -280,7 +301,7 @@ async def reqLaunch(req: Request):
             description: server is currently busy.
     """
     path = req.rel_url.query.get('path')
-    print('/execute?path={path}'.format(path = str(path)))
+    print('/execute?path={path}'.format(path=str(path)))
     if serverStatus != 'idle':
         return web.HTTPServiceUnavailable(reason='server is currently busy')
     if not req.can_read_body:
@@ -299,7 +320,8 @@ async def reqLaunch(req: Request):
     parameters['output_path'] = output_path
     asyncio.shield(spawn(req, launchNotebook(pathConverted, parameters, file_name)))
     return web.json_response({'path': replacePathLocalToServer(output_path)})
-        
+
+
 async def reqResult(req: Request):
     """
     ---
@@ -328,7 +350,8 @@ async def reqResult(req: Request):
     file = open(pathConverted, "r")
     content = file.read()
     file.close()
-    return web.json_response({'result' : content})
+    return web.json_response({'result': content})
+
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -336,8 +359,9 @@ if __name__ == '__main__':
     path = vars(parser.parse_args()).get('config')
     if (path):
         readConf(path)
+
     app = web.Application()
-    
+
     setup(app)
     app.router.add_route('GET', "/status", reqStatus)
     app.router.add_route('GET', "/files/all", reqFiles)

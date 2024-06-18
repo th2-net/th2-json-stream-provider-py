@@ -8,6 +8,7 @@ on:
       - dependabot**
     paths-ignore:
       - README.md
+      - 'local-run/**'
 
 jobs:
   get-git-branch:

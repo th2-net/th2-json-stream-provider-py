@@ -1,4 +1,4 @@
-# th2-json-stream-provider (j-sp) (0.0.2)
+# th2-json-stream-provider (j-sp) (0.0.3)
 
 This python server is made to launch Jupyter notebooks (*.ipynb) and get results from them.
 
@@ -74,3 +74,31 @@ Installation example:
   import sys
   !{sys.executable} -m pip install <package_name>==<package_version>
   ```
+
+## local run
+
+### run th2-rpt-viewer, th2-json-provider, jupyter-notebook are proxied by nginx
+
+You can put required files for you jupyter notebooks into `local-run/with-jupyter-notebook/user_data` folder. Please note that this folder is read-only for containers.<br>
+Or you can mount own folder by changing value of `USER_DATA_DIR` environment variable in the `local-run/with-jupyter-notebook/.evn` file.<br>
+Or change the `local-run/with-jupyter-notebook/compose.yml` file. Please note you should mount the same dictionary by the same path to `jupyter_notebook` and `json_stream_provider` services.
+
+#### start command
+```shell
+cd local-run/with-jupyter-notebook
+docker compose up
+```
+#### application URLs:
+* http://localhost - th2-rpt-viewer
+* http://localhost/jupyter - jupyter-notebook. You can authorise via token printed into `jupyter_notebook` logs:
+  ```shell
+  cd local-run/with-jupyter-notebook
+  docker compose logs jupyter_notebook | grep 'jupyter/lab?token=' | tail -1 | cut -d '=' -f 2
+  ```
+
+## Release notes:
+
+### 0.0.3
+
+* Added `json-stream` user to users group
+* Added docker compose for local run
