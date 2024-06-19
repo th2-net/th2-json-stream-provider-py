@@ -12,13 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-
-print("Executable at %s" % sys.executable)
-print("looking for modules at %s" % sys.path)
 os.system('pip list')
-os.system('pip show papermill')
 
 import subprocess
 import sys
@@ -30,7 +24,7 @@ from aiohttp_swagger import *
 from glob import glob
 import json
 import datetime
-import os.path
+import os
 import asyncio
 from argparse import ArgumentParser
 
@@ -57,10 +51,6 @@ def createDir(path: str):
         os.makedirs(path)
 
 
-def installRequirements(path):
-    subprocess.check_call(" ".join([sys.executable, "-m pip install --no-cache-dir -r", path]))
-
-
 def readConf(path: str):
     global notebooksDir
     global resultsDir
@@ -69,17 +59,17 @@ def readConf(path: str):
         file = open(path, "r")
         result = json.load(file)
         notebooksDir = result.get('notebooks', notebooksDir)
+        print('notebooksDir=%s' % notebooksDir)
         if notebooksDir:
             createDir(notebooksDir)
         resultsDir = result.get('results', resultsDir)
+        print('resultsDir=%s' % resultsDir)
         if resultsDir:
             createDir(resultsDir)
         logDir = result.get('logs', logDir)
+        print('logDir=%s' % logDir)
         if logDir:
             createDir(logDir)
-        # reqDir = result.get('requirements', None)
-        # if reqDir:
-        #    installRequirements(reqDir)
     except Exception as e:
         print(e)
 
@@ -265,7 +255,7 @@ async def reqArguments(req: Request):
     return web.json_response(params)
 
 
-async def launchNotebook(input, arguments=None, file_name=None):
+def launchNotebook(input, arguments=None, file_name=None):
     global serverStatus
     print('launching notebook {input} with {arguments}'.format(input=input, arguments=arguments))
     serverStatus = 'busy'
@@ -318,7 +308,7 @@ async def reqLaunch(req: Request):
     output_path = resultsDir + '/%s.jsonl' % str(file_name)
     parameters = await req.json()
     parameters['output_path'] = output_path
-    asyncio.shield(spawn(req, launchNotebook(pathConverted, parameters, file_name)))
+    launchNotebook(pathConverted, parameters, file_name)
     return web.json_response({'path': replacePathLocalToServer(output_path)})
 
 
