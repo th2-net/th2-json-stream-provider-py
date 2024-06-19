@@ -255,10 +255,9 @@ async def reqArguments(req: Request):
     return web.json_response(params)
 
 
-def launchNotebook(input, arguments=None, file_name=None):
+async def launchNotebook(input, arguments=None, file_name=None):
     global serverStatus
     print('launching notebook {input} with {arguments}'.format(input=input, arguments=arguments))
-    serverStatus = 'busy'
     logOut: str = (logDir + '/%s.log.ipynb' % file_name) if logDir and file_name else None
     try:
         with pm.utils.chdir(input[:input.rfind('/')]):
@@ -269,7 +268,6 @@ def launchNotebook(input, arguments=None, file_name=None):
         print(error)
         return web.HTTPInternalServerError(reason=error)
     finally:
-        serverStatus = 'idle'
         print(asyncio.all_tasks())
 
 
@@ -293,8 +291,6 @@ async def reqLaunch(req: Request):
     """
     path = req.rel_url.query.get('path')
     print('/execute?path={path}'.format(path=str(path)))
-    if serverStatus != 'idle':
-        return web.HTTPServiceUnavailable(reason='server is currently busy')
     if not req.can_read_body:
         return web.HTTPBadRequest(reason='body with parameters not present')
     path = req.rel_url.query.get('path')
@@ -309,7 +305,7 @@ async def reqLaunch(req: Request):
     output_path = resultsDir + '/%s.jsonl' % str(file_name)
     parameters = await req.json()
     parameters['output_path'] = output_path
-    launchNotebook(pathConverted, parameters, file_name)
+    asyncio.shield(asyncio.create_task(launchNotebook(pathConverted, parameters, file_name)))
     return web.json_response({'path': replacePathLocalToServer(output_path)})
 
 
@@ -333,8 +329,6 @@ async def reqResult(req: Request):
     """
     path = req.rel_url.query.get('path')
     print('/result?path={path}'.format(path=str(path)))
-    if serverStatus != 'idle':
-        return web.HTTPServiceUnavailable(reason='server is currently busy')
     pathConverted = path and replacePathServerToLocal(path)
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
