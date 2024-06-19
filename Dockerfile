@@ -34,7 +34,7 @@ USER json-stream
 ENV HOME="/home/json-stream"
 ENV PATH="${HOME}/.local/bin:${PATH}"
 ENV XDG_CACHE_HOME="${HOME}/.cache"
-ENV PYTHONPATH="${HOME}/.local/lib/python3.9/site-packages:${PYTHONPATH}"
+ENV PYTHONPATH="${HOME}:/home/jovyan/.local/lib/python3.9/site-packages:/.local/lib/python3.9/site-packages:${PYTHONPATH}"
 ENV PIP_CONFIG_FILE="${HOME}/.pip/pip.conf"
 
 ENTRYPOINT ["python", "/app/server.py"]
