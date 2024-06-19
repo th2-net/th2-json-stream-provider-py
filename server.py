@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 os.system('pip list')
 
 import subprocess
@@ -24,7 +25,6 @@ from aiohttp_swagger import *
 from glob import glob
 import json
 import datetime
-import os
 import asyncio
 from argparse import ArgumentParser
 
@@ -270,6 +270,7 @@ def launchNotebook(input, arguments=None, file_name=None):
         return web.HTTPInternalServerError(reason=error)
     finally:
         serverStatus = 'idle'
+        print(asyncio.all_tasks())
 
 
 async def reqLaunch(req: Request):
