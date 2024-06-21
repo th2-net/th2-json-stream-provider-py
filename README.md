@@ -98,6 +98,10 @@ docker compose up
 
 ## Release notes:
 
+### 0.0.4
+
+* added `${HOME}/python/lib` into `PYTHONPATH` environment variable
+
 ### 0.0.3
 
 * Added `json-stream` user to users group

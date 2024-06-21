@@ -33,8 +33,12 @@ USER json-stream
 ENV HOME="/home/json-stream"
 ENV PATH="${HOME}/.local/bin:${PATH}"
 ENV XDG_CACHE_HOME="${HOME}/.cache"
-ENV PYTHONPATH="${HOME}/.local/lib/python3.9/site-packages:${PYTHONPATH}"
+ENV PYTHON_SHARED_LIB_PATH="${HOME}/python/lib"
+ENV PYTHON_LOCAL_LIB_PATH="${HOME}/.local/lib/python3.9/site-packages"
+ENV PYTHONPATH="${PYTHONPATH}:${PYTHON_LOCAL_LIB_PATH}:${PYTHON_LOCAL_LIB_PATH}"
 ENV PIP_CONFIG_FILE="${HOME}/.pip/pip.conf"
+
+RUN mkdir -p "${PYTHON_SHARED_LIB_PATH}"
 
 ENTRYPOINT ["python", "/app/server.py"]
 CMD ["/var/th2/config/custom.json"]
