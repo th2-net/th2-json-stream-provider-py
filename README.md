@@ -101,6 +101,12 @@ docker compose up
 ### 0.0.4
 
 * added `${HOME}/python/lib` into `PYTHONPATH` environment variable
+* update local run with jupyter-notebook:
+  * updated jupyter-notebook Dockerfile: 
+    * used `jupyter/datascience-notebook:python-3.9`
+    * defined `PYTHONPATH`, `PIP_TARGET` environment variables
+  * updated compose:
+    * added `python_lib` volume
 
 ### 0.0.3
 
