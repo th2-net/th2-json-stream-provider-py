@@ -20,6 +20,7 @@ ENV PATH="${HOME}/.local/bin:${PATH}"
 ENV XDG_CACHE_HOME="${HOME}/.cache"
 ENV PYTHONPATH="${HOME}/.local/lib/python3.9/site-packages:${PYTHONPATH}"
 ENV PIP_CONFIG_FILE="${HOME}/.pip/pip.conf"
+ENV PYTHONPATH="${PYTHONPATH}:/opt/conda/lib/python3.9/site-packages"
 
 # Install any needed dependencies specified in requirements.txt
 RUN pip install -r requirements.txt
