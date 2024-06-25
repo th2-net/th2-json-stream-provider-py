@@ -27,12 +27,14 @@ import json
 import datetime
 import asyncio
 from argparse import ArgumentParser
+import logging
 
 serverStatus: str = 'idle'
 notebooksDir: str = '/home/jupyter-notebook/'
 resultsDir: str = '/home/jupyter-notebook/results/'
 logDir: str = '/home/jupyter-notebook/logs/'
 tasks: dict = {}
+logger: logging.Logger
 
 
 def notebooksReg(path):
@@ -56,19 +58,20 @@ def readConf(path: str):
     global notebooksDir
     global resultsDir
     global logDir
+    global logger
     try:
         file = open(path, "r")
         result = json.load(file)
         notebooksDir = result.get('notebooks', notebooksDir)
-        print('notebooksDir=%s' % notebooksDir)
+        logger.info('notebooksDir=%s', notebooksDir)
         if notebooksDir:
             createDir(notebooksDir)
         resultsDir = result.get('results', resultsDir)
-        print('resultsDir=%s' % resultsDir)
+        logger.info('resultsDir=%s',resultsDir)
         if resultsDir:
             createDir(resultsDir)
         logDir = result.get('logs', logDir)
-        print('logDir=%s' % logDir)
+        logger.info('logDir=%s', logDir)
         if logDir:
             createDir(logDir)
     except Exception as e:
@@ -166,8 +169,9 @@ async def reqNotebooks(req: Request):
         "200":
             description: successful operation. Return string array of available files.
     """
+    global logger
     path = req.rel_url.query.get('path')
-    print('/files/notebooks?path={path}'.format(path=str(path)))
+    logger.info('/files/notebooks?path={path}'.format(path=str(path)))
     pathConverted = path and replacePathServerToLocal(path)
     dirsNote = []
     if path:
@@ -202,8 +206,9 @@ async def reqJsons(req: Request):
         "200":
             description: successful operation. Return string array of available files.
     """
+    global logger
     path = req.rel_url.query.get('path')
-    print('/files/results?path={path}'.format(path=str(path)))
+    logger.info('/files/results?path={path}'.format(path=str(path)))
     pathConverted = path and replacePathServerToLocal(path)
     dirsNote = []
     dirsRes = []
@@ -247,8 +252,9 @@ async def reqArguments(req: Request):
         "404":
             description: requested file doesn't exist.
     """
+    global logger
     path = req.rel_url.query['path']
-    print('/files?path={path}'.format(path=str(path)))
+    logger.info('/files?path={path}'.format(path=str(path)))
     pathConverted = path and replacePathServerToLocal(path)
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
@@ -258,28 +264,29 @@ async def reqArguments(req: Request):
 
 async def launchNotebook(input, arguments, file_name, task_id):
     global tasks
-    print('launching notebook {input} with {arguments}'.format(input=input, arguments=arguments))
+    global logger
+    logger.info('launching notebook {input} with {arguments}'.format(input=input, arguments=arguments))
     logOut: str = (logDir + '/%s.log.ipynb' % file_name) if logDir and file_name else None
     try:
         with pm.utils.chdir(input[:input.rfind('/')]):
             input = input[input.rfind('/')+1:]
             pm.execute_notebook(input, logOut, arguments)
-            print('successfully launched notebook {input}'.format(input=input))
+            logger.debug('successfully launched notebook {input}'.format(input=input))
             if tasks.get(task_id):
                 tasks[task_id] = {
                     'status': 'success',
                     'result': arguments.get('output_path')
                 }
     except Exception as error:
-        print('failed to launch notebook {input}'.format(input=input))
-        print(error)
+        logger.info('failed to launch notebook {input}'.format(input=input))
+        logger.debug(error)
         if tasks.get(task_id):
             tasks[task_id] = {
                 'status': 'failed',
                 'result': error
             }
     finally:
-        print('ended launch notebook {input} with {arguments}'.format(input=input, arguments=arguments))
+        logger.info('ended launch notebook {input} with {arguments}'.format(input=input, arguments=arguments))
 
 
 async def reqLaunch(req: Request):
@@ -302,8 +309,9 @@ async def reqLaunch(req: Request):
     """
     from uuid import uuid4
     global tasks
+    global logger
     path = req.rel_url.query.get('path')
-    print('/execute?path={path}'.format(path=str(path)))
+    logger.info('/execute?path={path}'.format(path=str(path)))
     if not req.can_read_body:
         return web.HTTPBadRequest(reason='body with parameters not present')
     path = req.rel_url.query.get('path')
@@ -347,14 +355,13 @@ async def reqResult(req: Request):
             description: server is currently busy.
     """
     global tasks
+    global logger
     task_id = req.rel_url.query.get('id')
-    print('/result?id={task_id}'.format(task_id=str(task_id)))
+    logger.info('/result?id={task_id}'.format(task_id=str(task_id)))
     task = tasks.get(task_id, None)
-    print(task)
     if not task:
         return web.HTTPNotFound()
     status = task.get('status', None)
-    print(status)
     if status == 'in progress':
         return web.json_response({'status': status})
     elif status == 'success':
@@ -368,7 +375,6 @@ async def reqResult(req: Request):
         return web.json_response({'status': status, 'result': content})
     elif status == 'failed':
         error = task.get('result', Exception())
-        print(error)
         return web.json_response({'status': status, 'result': str(error)})
     else:
         return web.HTTPNotFound()
@@ -392,8 +398,9 @@ async def reqStop(req: Request):
             description: server is currently busy.
     """
     global tasks
+    global logger
     task_id = req.rel_url.query.get('id')
-    print('/stop?id={task_id}'.format(task_id=str(task_id)))
+    logger.info('/stop?id={task_id}'.format(task_id=str(task_id)))
     task = tasks.pop(task_id, None)
     try:
         if task:
@@ -403,6 +410,8 @@ async def reqStop(req: Request):
     return web.HTTPOk()
 
 if __name__ == '__main__':
+    logging.basicConfig(filename='var/th2/config/log4py.conf', level=logging.DEBUG)
+    logger=logging.getLogger('th2_common')
     parser = ArgumentParser()
     parser.add_argument('config')
     path = vars(parser.parse_args()).get('config')
@@ -410,7 +419,6 @@ if __name__ == '__main__':
         readConf(path)
 
     app = web.Application()
-
 
     setup(app)
     app.router.add_route('GET', "/status", reqStatus)
@@ -422,5 +430,5 @@ if __name__ == '__main__':
     app.router.add_route('GET', "/result", reqResult)
     app.router.add_route('POST', "/stop", reqStop)
     setup_swagger(app)
-    print('starting server')
+    logger.info('starting server')
     web.run_app(app)

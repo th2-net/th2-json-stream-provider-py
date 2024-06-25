@@ -3,3 +3,4 @@ aiohttp
 aiojobs
 aiohttp-swagger
 ipykernel
+logging
