@@ -107,6 +107,10 @@ docker compose up
     * defined `PYTHONPATH`, `PIP_TARGET` environment variables
   * updated compose:
     * added `python_lib` volume
+* added saving of current tasks
+  * task contains status(success, failed, in progress) and id using which task can be stopped
+* added end-point `/stop` for stopping requested task
+* updated end-point `/result` it now requests task by id and returns file, reason for failed run or informs that task is 'in progress' depending on task status
 
 ### 0.0.3
 
