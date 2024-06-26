@@ -88,6 +88,13 @@ Or change the `local-run/with-jupyter-notebook/compose.yml` file. Please note yo
 cd local-run/with-jupyter-notebook
 docker compose up
 ```
+#### clean command
+```shell
+cd local-run/with-jupyter-notebook
+docker compose rm --force --volumes --stop
+docker compose down --volumes
+docker compose build
+```
 #### application URLs:
 * http://localhost - th2-rpt-viewer
 * http://localhost/jupyter - jupyter-notebook. You can authorise via token printed into `jupyter_notebook` logs:
@@ -97,6 +104,20 @@ docker compose up
   ```
 
 ## Release notes:
+
+### 0.0.4
+
+* added `${HOME}/python/lib` into `PYTHONPATH` environment variable
+* update local run with jupyter-notebook:
+  * updated jupyter-notebook Dockerfile: 
+    * used `jupyter/datascience-notebook:python-3.9`
+    * defined `PYTHONPATH`, `PIP_TARGET` environment variables
+  * updated compose:
+    * added `python_lib` volume
+* added saving of current tasks
+  * task contains status(success, failed, in progress) and id using which task can be stopped
+* added end-point `/stop` for stopping requested task
+* updated end-point `/result` it now requests task by id and returns file, reason for failed run or informs that task is 'in progress' depending on task status
 
 ### 0.0.3
 

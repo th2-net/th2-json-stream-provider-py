@@ -1,11 +1,12 @@
 services:
   json_stream_provider:
-    image: ghcr.io/th2-net/th2-json-stream-provider-py:0.0.3-compose-9418538929-b1c820e
+    image: ghcr.io/th2-net/th2-json-stream-provider-py:0.0.4-th2-5208-9678438968-c339905
     ports:
       - "8081:8080"
     volumes:
       - j_sp_volume:/home/json-stream/:rw
       - jupyter_volume:/home/jovyan/:rw
+      - python_lib:/home/json-stream/python/lib:ro
       - ${USER_DATA_DIR}:/home/jovyan/user-data/:ro
       - ./json-stream-provider/custom.json:/var/th2/config/custom.json:ro
     networks:
@@ -19,12 +20,13 @@ services:
       - "8082:8888"
     volumes:
       - jupyter_volume:/home/jovyan/:rw
+      - python_lib:/home/jovyan/python/lib:rw
       - ${USER_DATA_DIR}:/home/jovyan/user-data/:ro
     networks:
       - th2_network
 
   th2_rpt_viewer:
-    image: ghcr.io/th2-net/th2-rpt-viewer:5.2.7-th2-5142-9416197441
+    image: ghcr.io/th2-net/th2-rpt-viewer:5.2.8-th2-5208-9660165336
     ports:
       - "8083:8080"
     networks:
@@ -42,6 +44,7 @@ services:
 volumes:
   jupyter_volume:
   j_sp_volume:
+  python_lib:
 
 networks:
   th2_network:
