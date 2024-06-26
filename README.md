@@ -88,6 +88,13 @@ Or change the `local-run/with-jupyter-notebook/compose.yml` file. Please note yo
 cd local-run/with-jupyter-notebook
 docker compose up
 ```
+#### clean command
+```shell
+cd local-run/with-jupyter-notebook
+docker compose rm --force --volumes --stop
+docker compose down --volumes
+docker compose build
+```
 #### application URLs:
 * http://localhost - th2-rpt-viewer
 * http://localhost/jupyter - jupyter-notebook. You can authorise via token printed into `jupyter_notebook` logs:
