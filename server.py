@@ -313,7 +313,7 @@ async def reqLaunch(req: Request):
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
     if not os.path.exists(resultsDir):
-        return web.HTTPInternalServerError(reason='no output directory')
+        return web.HTTPInternalServerError(reason='No output directory')
     notebookName = pathConverted.split('/')[-1].split('.')[0];
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%S-%f")
     file_name = notebookName + '_' + timestamp
@@ -327,7 +327,7 @@ async def reqLaunch(req: Request):
         'job': job
     }
     asyncio.shield(job)
-    return web.json_response({'path': replacePathLocalToServer(output_path), 'task_id': task_id})
+    return web.json_response({'task_id': task_id})
 
 
 async def reqFile(req: Request):
@@ -391,13 +391,12 @@ async def reqResult(req: Request):
         return web.json_response({'status': status})
     elif status == 'success':
         path = task.get('result','')
-        pathConverted = replacePathLocalToServer(path)
-        if not path or not os.path.isfile(pathConverted):
+        if not path or not os.path.isfile(path):
             return web.HTTPNotFound(reason="Resulting file doesn't exist")
-        file = open(pathConverted, "r")
+        file = open(path, "r")
         content = file.read()
         file.close()
-        return web.json_response({'status': status, 'result': content})
+        return web.json_response({'status': status, 'result': content, 'path': replacePathLocalToServer(path) })
     elif status == 'failed':
         error = task.get('result', Exception())
         return web.json_response({'status': status, 'result': str(error)})
