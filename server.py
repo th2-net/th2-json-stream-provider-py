@@ -75,7 +75,7 @@ def readConf(path: str):
         if logDir:
             createDir(logDir)
     except Exception as e:
-        print(e)
+        logger.debug(e)
 
 
 async def reqStatus(req: Request):
@@ -391,7 +391,6 @@ async def reqResult(req: Request):
         return web.json_response({'status': status})
     elif status == 'success':
         path = task.get('result','')
-        print(path)
         pathConverted = replacePathLocalToServer(path)
         if not path or not os.path.isfile(pathConverted):
             return web.HTTPNotFound(reason="Resulting file doesn't exist")
