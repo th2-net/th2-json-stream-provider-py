@@ -105,6 +105,20 @@ docker compose build
 
 ## Release notes:
 
+### 0.0.5
+
+* added `/file` request for loading content of single jsonl file
+* changed `replacePathServerToLocal` to return empty string in case of not starting with `./notebooks` or `./results`
+
+#### Frontend changes
+
+* added option to change default view type of result group
+* added display of #display-table field in Table view type
+* added option to view last N results of Notebook
+* added validation of Notebook's parameters
+* fixed clearing of Notebook's parameters on run
+* increased width of parameters' inputs
+
 ### 0.0.4
 
 * added `${HOME}/python/lib` into `PYTHONPATH` environment variable
