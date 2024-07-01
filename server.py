@@ -336,6 +336,32 @@ async def reqLaunch(req: Request):
     return web.json_response({'path': replacePathLocalToServer(output_path), 'task_id': task_id})
 
 
+async def reqFile(req: Request):
+    """
+    ---
+    description: This end-point allows to get file from requested path.
+    tags:
+    - Execution operation
+    produces:
+    - application/json
+    responses:
+        "200":
+            description: successful operation. Return file's json.
+        "404":
+            description: requested file doesn't exist.
+    """
+    global tasks
+    global logger
+    path = req.rel_url.query.get('path')
+    logger.info('/file?path={path}'.format(path=str(path)))
+    pathConverted = replacePathServerToLocal(path)
+    if not path or not os.path.isfile(pathConverted):
+        return web.HTTPNotFound()
+    file = open(pathConverted, "r")
+    content = file.read()
+    file.close()
+    return web.json_response({'result': content})
+
 async def reqResult(req: Request):
     """
     ---
@@ -426,6 +452,7 @@ if __name__ == '__main__':
     app.router.add_route('GET', "/files/notebooks", reqNotebooks)
     app.router.add_route('GET', "/files/results", reqJsons)
     app.router.add_route('GET', "/files", reqArguments)
+    app.router.add_route('GET', "/file", reqFile)
     app.router.add_route('POST', "/execute", reqLaunch)
     app.router.add_route('GET', "/result", reqResult)
     app.router.add_route('POST', "/stop", reqStop)
