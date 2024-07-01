@@ -105,14 +105,16 @@ def replaceSlashes(path: str):
 async def reqFiles(req: Request):
     """
     ---
-    description: This end-point allows to get files that could be requested.
+    description: This end-point allows to get files that could be requested. Query requires path to directory in which files is searched.
     tags:
     - File operation
     produces:
     - application/json
     responses:
         "200":
-            description: successful operation. Return string array of available files.
+            description: successful operation. Return dictionary of available directories/files.
+        "404":
+            description: failed operation when queried directory doesn't exist.
     """
     path = path = req.rel_url.query.get('path')
     dirsNote = []
@@ -153,26 +155,29 @@ def replacePathServerToLocal(path: str):
         return replaceSlashes(path).replace('./notebooks/', notebooksDir, 1)
     elif path.startswith('./results'):
         return replaceSlashes(path).replace('./results/', resultsDir, 1)
-    else:
-        return replaceSlashes(path)
+    return ''
 
 
 async def reqNotebooks(req: Request):
     """
     ---
-    description: This end-point allows to get notebooks that could be requested.
+    description: This end-point allows to get notebooks that could be requested. Query requires path to directory in which notebooks is searched.
     tags:
     - File operation
     produces:
     - application/json
     responses:
         "200":
-            description: successful operation. Return string array of available files.
+            description: successful operation. Return dictionary of available directories/files.
+        "404":
+            description: failed operation when queried directory doesn't exist or requested path didn't start with ./notebooks.
     """
     global logger
     path = req.rel_url.query.get('path')
     logger.info('/files/notebooks?path={path}'.format(path=str(path)))
     pathConverted = path and replacePathServerToLocal(path)
+    if pathConverted == '':
+        return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
     dirsNote = []
     if path:
         if os.path.isdir(pathConverted):
@@ -197,19 +202,23 @@ async def reqNotebooks(req: Request):
 async def reqJsons(req: Request):
     """
     ---
-    description: This end-point allows to get jsons that could be requested.
+    description: This end-point allows to get jsonls that could be requested. Query requires path to directory in which jsonls is searched.
     tags:
     - File operation
     produces:
     - application/json
     responses:
         "200":
-            description: successful operation. Return string array of available files.
+            description: successful operation. Return dictionary of available directories/files.
+        "404":
+            description: failed operation when queried directory doesn't exist or requested path didn't start with ./results or ./notebooks.
     """
     global logger
     path = req.rel_url.query.get('path')
     logger.info('/files/results?path={path}'.format(path=str(path)))
     pathConverted = path and replacePathServerToLocal(path)
+    if pathConverted == '':
+        return web.HTTPNotFound(reason="Requested path didn't start with ./results or ./notebooks")
     dirsNote = []
     dirsRes = []
     if path:
@@ -241,7 +250,7 @@ async def reqJsons(req: Request):
 async def reqArguments(req: Request):
     """
     ---
-    description: This end-point allows to get parameters for file in requested path.
+    description: This end-point allows to get parameters for notebook in requested path. Query requires path to notebook.
     tags:
     - File operation
     produces:
@@ -250,12 +259,14 @@ async def reqArguments(req: Request):
         "200":
             description: successful operation. Return json of file's parameters.
         "404":
-            description: requested file doesn't exist.
+            description: failed operation when queried file doesn't exist or requested path didn't start with ./notebooks.
     """
     global logger
     path = req.rel_url.query['path']
     logger.info('/files?path={path}'.format(path=str(path)))
     pathConverted = path and replacePathServerToLocal(path)
+    if pathConverted == '':
+        return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
     params = pm.inspect_notebook(pathConverted)
@@ -292,7 +303,7 @@ async def launchNotebook(input, arguments, file_name, task_id):
 async def reqLaunch(req: Request):
     """
     ---
-    description: This end-point allows to get file's parameters for requested path.
+    description: This end-point allows to start notebook. Query requires path to notebook. Body requred to be dictionary of parameters.
     tags:
     - Execution operation
     produces:
@@ -301,11 +312,11 @@ async def reqLaunch(req: Request):
         "200":
             description: successful operation. Return json with path for resulting file.
         "400":
-            description: body with parameters not present.
+            description: failed operation. body with parameters not present.
         "404":
-            description: requested file doesn't exist.
-        "503":
-            description: server is currently busy.
+            description: failed operation. requested file doesn't exist or requested path didn't start with ./notebooks.
+        "500":
+            description: failed operation. directory for output doesn't exist.
     """
     from uuid import uuid4
     global tasks
@@ -313,9 +324,11 @@ async def reqLaunch(req: Request):
     path = req.rel_url.query.get('path')
     logger.info('/execute?path={path}'.format(path=str(path)))
     if not req.can_read_body:
-        return web.HTTPBadRequest(reason='body with parameters not present')
+        return web.HTTPBadRequest(reason='Body with parameters not present')
     path = req.rel_url.query.get('path')
     pathConverted = path and replacePathServerToLocal(path)
+    if pathConverted == '':
+        return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
     if not os.path.exists(resultsDir):
@@ -339,22 +352,24 @@ async def reqLaunch(req: Request):
 async def reqFile(req: Request):
     """
     ---
-    description: This end-point allows to get file from requested path.
+    description: This end-point allows to get file from requested path. Query requires path to file.
     tags:
-    - Execution operation
+    - File operation
     produces:
     - application/json
     responses:
         "200":
             description: successful operation. Return file's json.
         "404":
-            description: requested file doesn't exist.
+            description: failed operation. requested file doesn't exist or requested path didn't start with ./results or ./notebooks.
     """
     global tasks
     global logger
     path = req.rel_url.query.get('path')
     logger.info('/file?path={path}'.format(path=str(path)))
     pathConverted = replacePathServerToLocal(path)
+    if pathConverted == '':
+        return web.HTTPNotFound(reason="Requested path didn't start with ./results or ./notebooks")
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
     file = open(pathConverted, "r")
@@ -365,20 +380,21 @@ async def reqFile(req: Request):
 async def reqResult(req: Request):
     """
     ---
-    description: This end-point allows to get result from requested path.
+    description: This end-point allows to get result from requested task. Query requires task id from which result is required.
     tags:
     - Execution operation
     produces:
     - application/json
     responses:
         "200":
-            description: successful operation. Return resulting file's json.
+            description: successful operation. Return different data depending on status:
+                'in progress': return json with task's status
+                'success': return json with result's content
+                'error': return json with reason of failed run
         "400":
-            description: body with parameters not present.
+            description: failed operation. body with parameters not present.
         "404":
-            description: requested file doesn't exist.
-        "503":
-            description: server is currently busy.
+            description: failed operation. requested task doesn't exist or resulting file doesn't exist or status is unknown.
     """
     global tasks
     global logger
@@ -386,7 +402,7 @@ async def reqResult(req: Request):
     logger.info('/result?id={task_id}'.format(task_id=str(task_id)))
     task = tasks.get(task_id, None)
     if not task:
-        return web.HTTPNotFound()
+        return web.HTTPNotFound(reason="Requested task doesn't exist")
     status = task.get('status', None)
     if status == 'in progress':
         return web.json_response({'status': status})
@@ -394,7 +410,7 @@ async def reqResult(req: Request):
         path = task.get('result','')
         pathConverted = replacePathServerToLocal(path)
         if not path or not os.path.isfile(pathConverted):
-            return web.HTTPNotFound()
+            return web.HTTPNotFound(reason="Resulting file doesn't exist")
         file = open(pathConverted, "r")
         content = file.read()
         file.close()
@@ -408,20 +424,16 @@ async def reqResult(req: Request):
 async def reqStop(req: Request):
     """
     ---
-    description: This end-point allows to stop task by id.
+    description: This end-point allows to stop task. Query requires task id which will be stopped.
     tags:
     - Execution operation
     produces:
     - application/json
     responses:
         "200":
-            description: successful operation. Return resulting file's json.
-        "400":
-            description: body with parameters not present.
-        "404":
-            description: requested file doesn't exist.
-        "503":
-            description: server is currently busy.
+            description: successful operation. Return nothing.
+        "500":
+            description: failed operation. failed to stop process.
     """
     global tasks
     global logger
