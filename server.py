@@ -97,49 +97,12 @@ async def reqStatus(req: Request):
 def getDirs(path):
     return [f.path for f in os.scandir(path) if f.is_dir() and f.name[0] != '.']
 
+def getFiles(path, type):
+    return [f.path for f in os.scandir(path) if f.is_file() and f.name.endswith(type)]
+
 
 def replaceSlashes(path: str):
     return path.replace('\\', '/')
-
-
-async def reqFiles(req: Request):
-    """
-    ---
-    description: This end-point allows to get files that could be requested. Query requires path to directory in which files is searched.
-    tags:
-    - File operation
-    produces:
-    - application/json
-    responses:
-        "200":
-            description: successful operation. Return dictionary of available directories/files.
-        "404":
-            description: failed operation when queried directory doesn't exist.
-    """
-    path = path = req.rel_url.query.get('path')
-    dirsNote = []
-    dirsRes = []
-    if path:
-        if os.path.isdir(path):
-            dirs = list(getDirs(path))
-            files = glob(notebooksReg(path)) + glob(resultsReg(path))
-            return web.json_response({
-                'directories': dirs,
-                'files': files
-            })
-        else:
-            return web.HTTPNotFound()
-
-    if os.path.isdir(notebooksDir):
-        dirsNote = getDirs(notebooksDir)
-    if os.path.isdir(resultsDir):
-        dirsRes = getDirs(resultsDir)
-    files = glob(notebooksReg(notebooksDir)) + glob(resultsReg(resultsDir))
-    return web.json_response({
-        'directories': list({*dirsNote, *dirsRes}),
-        'files': files
-    })
-
 
 def replacePathLocalToServer(path: str):
     if path.startswith(notebooksDir):
@@ -155,7 +118,7 @@ def replacePathServerToLocal(path: str):
         return replaceSlashes(path).replace('./notebooks/', notebooksDir, 1)
     elif path.startswith('./results'):
         return replaceSlashes(path).replace('./results/', resultsDir, 1)
-    return ''
+    raise Exception()
 
 
 async def reqNotebooks(req: Request):
@@ -173,29 +136,38 @@ async def reqNotebooks(req: Request):
             description: failed operation when queried directory doesn't exist or requested path didn't start with ./notebooks.
     """
     global logger
-    path = req.rel_url.query.get('path')
+    path = req.rel_url.query.get('path', '')
     logger.info('/files/notebooks?path={path}'.format(path=str(path)))
-    pathConverted = path and replacePathServerToLocal(path)
-    if pathConverted == '':
+    if path == '':
+        if os.path.isdir(notebooksDir):
+            dirsNote = list(map(replacePathLocalToServer, getDirs(notebooksDir)))
+        files = list(map(replacePathLocalToServer, getFiles(notebooksDir, '.ipynb')))
+
+        return web.json_response({
+            'directories': dirsNote,
+            'files': files
+        })
+    
+    try:
+        pathConverted = replacePathServerToLocal(path)
+    except:
         return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
+    
     dirsNote = []
     if path:
         if os.path.isdir(pathConverted):
             dirs = list(map(replacePathLocalToServer, getDirs(pathConverted)))
-            files = list(map(replacePathLocalToServer, glob(notebooksReg(pathConverted))))
+            files = list(map(replacePathLocalToServer, getFiles(pathConverted, '.ipynb')))
             return web.json_response({
                 'directories': dirs,
                 'files': files
             })
         else:
             return web.HTTPNotFound()
-
-    if os.path.isdir(notebooksDir):
-        dirsNote = list(map(replacePathLocalToServer, getDirs(notebooksDir)))
-    files = list(map(replacePathLocalToServer, glob(notebooksReg(notebooksDir))))
+    
     return web.json_response({
-        'directories': dirsNote,
-        'files': files
+        'directories': [],
+        'files': []
     })
 
 
@@ -214,17 +186,34 @@ async def reqJsons(req: Request):
             description: failed operation when queried directory doesn't exist or requested path didn't start with ./results or ./notebooks.
     """
     global logger
-    path = req.rel_url.query.get('path')
+    path = req.rel_url.query.get('path', '')
     logger.info('/files/results?path={path}'.format(path=str(path)))
-    pathConverted = path and replacePathServerToLocal(path)
-    if pathConverted == '':
+
+    if path == '':
+        if os.path.isdir(resultsDir):
+            dirsRes = list(map(replacePathLocalToServer, getDirs(resultsDir)))
+
+        if os.path.isdir(notebooksDir):
+            dirsNote = list(map(replacePathLocalToServer, getDirs(notebooksDir)))
+
+        filesRes = list(map(replacePathLocalToServer, getFiles(resultsDir, '.jsonl')))
+        filesNote = list(map(replacePathLocalToServer, getFiles(notebooksDir, '.jsonl')))
+
+        return web.json_response({
+            'directories': list({*dirsNote, *dirsRes}),
+            'files': list({*filesNote, *filesRes})
+        })
+    
+    try:
+        pathConverted = replacePathServerToLocal(path)
+    except:
         return web.HTTPNotFound(reason="Requested path didn't start with ./results or ./notebooks")
     dirsNote = []
     dirsRes = []
     if path:
         if os.path.isdir(pathConverted):
             dirs = list(map(replacePathLocalToServer, getDirs(pathConverted)))
-            files = list(map(replacePathLocalToServer, glob(resultsReg(pathConverted))))
+            files = list(map(replacePathLocalToServer, getFiles(pathConverted, '.jsonl')))
             return web.json_response({
                 'directories': dirs,
                 'files': files
@@ -232,18 +221,9 @@ async def reqJsons(req: Request):
         else:
             return web.HTTPNotFound()
 
-    if os.path.isdir(resultsDir):
-        dirsRes = list(map(replacePathLocalToServer, getDirs(resultsDir)))
-
-    if os.path.isdir(notebooksDir):
-        dirsNote = list(map(replacePathLocalToServer, getDirs(notebooksDir)))
-
-    filesRes = list(map(replacePathLocalToServer, glob(resultsReg(resultsDir))))
-    filesNote = list(map(replacePathLocalToServer, glob(resultsReg(notebooksDir))))
-
     return web.json_response({
-        'directories': list({*dirsNote, *dirsRes}),
-        'files': list({*filesNote, *filesRes})
+        'directories': [],
+        'files': []
     })
 
 
@@ -262,10 +242,11 @@ async def reqArguments(req: Request):
             description: failed operation when queried file doesn't exist or requested path didn't start with ./notebooks.
     """
     global logger
-    path = req.rel_url.query['path']
+    path = req.rel_url.query.get('path', '')
     logger.info('/files?path={path}'.format(path=str(path)))
-    pathConverted = path and replacePathServerToLocal(path)
-    if pathConverted == '':
+    try:
+        pathConverted = replacePathServerToLocal(path)
+    except:
         return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
@@ -321,13 +302,13 @@ async def reqLaunch(req: Request):
     from uuid import uuid4
     global tasks
     global logger
-    path = req.rel_url.query.get('path')
+    path = req.rel_url.query.get('path', '')
     logger.info('/execute?path={path}'.format(path=str(path)))
     if not req.can_read_body:
         return web.HTTPBadRequest(reason='Body with parameters not present')
-    path = req.rel_url.query.get('path')
-    pathConverted = path and replacePathServerToLocal(path)
-    if pathConverted == '':
+    try:
+        pathConverted = replacePathServerToLocal(path)
+    except:
         return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
@@ -365,10 +346,12 @@ async def reqFile(req: Request):
     """
     global tasks
     global logger
-    path = req.rel_url.query.get('path')
+    path = req.rel_url.query.get('path', '')
     logger.info('/file?path={path}'.format(path=str(path)))
-    pathConverted = replacePathServerToLocal(path)
-    if pathConverted == '':
+    pathConverted = replacePathServerToLocal(path)    
+    try:
+        pathConverted = replacePathServerToLocal(path)
+    except:
         return web.HTTPNotFound(reason="Requested path didn't start with ./results or ./notebooks")
     if not path or not os.path.isfile(pathConverted):
         return web.HTTPNotFound()
@@ -408,7 +391,8 @@ async def reqResult(req: Request):
         return web.json_response({'status': status})
     elif status == 'success':
         path = task.get('result','')
-        pathConverted = replacePathServerToLocal(path)
+        print(path)
+        pathConverted = replacePathLocalToServer(path)
         if not path or not os.path.isfile(pathConverted):
             return web.HTTPNotFound(reason="Resulting file doesn't exist")
         file = open(pathConverted, "r")
@@ -460,7 +444,6 @@ if __name__ == '__main__':
 
     setup(app)
     app.router.add_route('GET', "/status", reqStatus)
-    app.router.add_route('GET', "/files/all", reqFiles)
     app.router.add_route('GET', "/files/notebooks", reqNotebooks)
     app.router.add_route('GET', "/files/results", reqJsons)
     app.router.add_route('GET', "/files", reqArguments)
