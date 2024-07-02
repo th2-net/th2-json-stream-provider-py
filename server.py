@@ -118,7 +118,7 @@ def replacePathServerToLocal(path: str):
         return replaceSlashes(path).replace('./notebooks/', notebooksDir, 1)
     elif path.startswith('./results'):
         return replaceSlashes(path).replace('./results/', resultsDir, 1)
-    raise Exception()
+    raise Exception("Path didn't start with notebooks or results folder")
 
 
 async def reqNotebooks(req: Request):
