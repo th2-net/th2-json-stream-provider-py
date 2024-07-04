@@ -1,4 +1,4 @@
-# th2-json-stream-provider (j-sp) (0.0.3)
+# th2-json-stream-provider (j-sp) (0.0.5)
 
 This python server is made to launch Jupyter notebooks (*.ipynb) and get results from them.
 
