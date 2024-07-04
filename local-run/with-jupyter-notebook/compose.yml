@@ -7,7 +7,7 @@ services:
       - j_sp_volume:/home/json-stream/:rw
       - jupyter_volume:/home/jovyan/:rw
       - python_lib:/home/json-stream/python/lib:ro
-      - ${USER_DATA_DIR}:/home/jovyan/user-data/:ro
+      - ${USER_DATA_DIR}:/home/jovyan/user-data/:rw
       - ./json-stream-provider/custom.json:/var/th2/config/custom.json:ro
     networks:
       - th2_network
@@ -21,7 +21,7 @@ services:
     volumes:
       - jupyter_volume:/home/jovyan/:rw
       - python_lib:/home/jovyan/python/lib:rw
-      - ${USER_DATA_DIR}:/home/jovyan/user-data/:ro
+      - ${USER_DATA_DIR}:/home/jovyan/user-data/:rw
     networks:
       - th2_network
 

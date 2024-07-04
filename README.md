@@ -117,6 +117,8 @@ docker compose build
     * added validation of Notebook's parameters
     * fixed clearing of Notebook's parameters on run
     * increased width of parameters' inputs
+  * updated compose:
+    * changed use data access from `ro` to `rw`
 
 ### 0.0.4
 
