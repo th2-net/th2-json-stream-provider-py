@@ -13,29 +13,30 @@
 # limitations under the License.
 
 import os
+
+from log_configuratior import configureLogging
+
 os.system('pip list')
 
-import subprocess
-import sys
 import papermill as pm
 from aiohttp.web_request import Request
 from aiohttp import web
 from aiojobs.aiohttp import setup, spawn
 from aiohttp_swagger import *
-from glob import glob
 import json
 import datetime
 import asyncio
 from argparse import ArgumentParser
-import logging
+import logging.config
 
 serverStatus: str = 'idle'
 notebooksDir: str = '/home/jupyter-notebook/'
 resultsDir: str = '/home/jupyter-notebook/results/'
 logDir: str = '/home/jupyter-notebook/logs/'
 tasks: dict = {}
-logger: logging.Logger
 
+configureLogging()
+logger: logging.Logger = logging.getLogger('j-sp')
 
 def notebooksReg(path):
     return path + '/*.ipynb'
@@ -75,7 +76,7 @@ def readConf(path: str):
         if logDir:
             createDir(logDir)
     except Exception as e:
-        logger.debug(e)
+        logger.error(f"Read '{path}' configuration failure", e)
 
 
 async def reqStatus(req: Request):
@@ -263,15 +264,14 @@ async def launchNotebook(input, arguments, file_name, task_id):
         with pm.utils.chdir(input[:input.rfind('/')]):
             input = input[input.rfind('/')+1:]
             pm.execute_notebook(input, logOut, arguments)
-            logger.debug('successfully launched notebook {input}'.format(input=input))
+            logger.info('successfully launched notebook {input}'.format(input=input))
             if tasks.get(task_id):
                 tasks[task_id] = {
                     'status': 'success',
                     'result': arguments.get('output_path')
                 }
     except Exception as error:
-        logger.info('failed to launch notebook {input}'.format(input=input))
-        logger.debug(error)
+        logger.error('failed to launch notebook {input}'.format(input=input), error)
         if tasks.get(task_id):
             tasks[task_id] = {
                 'status': 'failed',
@@ -430,8 +430,6 @@ async def reqStop(req: Request):
     return web.HTTPOk()
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='var/th2/config/log4py.conf', level=logging.DEBUG)
-    logger=logging.getLogger('th2_common')
     parser = ArgumentParser()
     parser.add_argument('config')
     path = vars(parser.parse_args()).get('config')

@@ -8,7 +8,7 @@ services:
       - jupyter_volume:/home/jovyan/:rw
       - python_lib:/home/json-stream/python/lib:ro
       - ${USER_DATA_DIR}:/home/jovyan/user-data/:rw
-      - ./json-stream-provider/custom.json:/var/th2/config/custom.json:ro
+      - ./json-stream-provider:/var/th2/config:ro
     networks:
       - th2_network
 
