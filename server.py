@@ -356,23 +356,21 @@ async def launch_notebook(input_path, arguments, file_name, task_id):
 def convert_parameter(parameter, notebook_path):
     parameter_type = parameter.get('type')
     parameter_value = parameter.get('value')
+    if (parameter_type == 'file path'):
+        try:
+            parameter_path = replace_server_to_local(parameter_value)
+        except:
+            raise Exception(
+                "Parameter {name} of type={type} with value={value} didn't start with ./notebooks or ./results"
+                .format(name=parameter.get('name'), type=parameter_type, value=parameter_value)
+                )
+
+        relative_path = os.path.relpath(parameter_path, notebook_path[:notebook_path.rfind('/')])
+
+        return relative_path
     
-    match parameter_type:
-        case 'file path':
-            try:
-                parameter_path = replace_server_to_local(parameter_value)
-            except:
-                raise Exception(
-                    "Parameter {name} of type={type} with value={value} didn't start with ./notebooks or ./results"
-                    .format(name=parameter.get('name'), type=parameter_type, value=parameter_value)
-                    )
-
-            relative_path = os.path.relpath(parameter_path, notebook_path[:notebook_path.rfind('/')])
-
-            return relative_path
-        case _:
-            return parameter_value
-
+    else:
+        return parameter_value
 
 
 async def req_launch(req: Request):
