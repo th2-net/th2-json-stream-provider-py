@@ -99,7 +99,7 @@ def getDirs(path):
     return [f.path for f in os.scandir(path) if f.is_dir() and f.name[0] != '.']
 
 def getFiles(path, type):
-    return [f.path for f in os.scandir(path) if f.is_file() and f.name.endswith(type)]
+    return [f.path for f in os.scandir(path) if f.is_file() and f.name.endswith(type) and f.name[0] != '.']
 
 
 def replaceSlashes(path: str):
@@ -140,13 +140,16 @@ async def reqNotebooks(req: Request):
     path_arg = req.rel_url.query.get('path', '')
     logger.info('/files/notebooks?path={path}'.format(path=str(path_arg)))
     if path_arg == '':
-        dirs_note = []
+        dirs = []
         if os.path.isdir(notebooksDir):
-            dirs_note = list(map(replacePathLocalToServer, getDirs(notebooksDir)))
+            dirs = list(map(replacePathLocalToServer, getDirs(notebooksDir)))
         files = list(map(replacePathLocalToServer, getFiles(notebooksDir, '.ipynb')))
 
+        dirs.sort()
+        files.sort()
+
         return web.json_response({
-            'directories': dirs_note,
+            'directories': dirs,
             'files': files
         })
     
@@ -159,6 +162,10 @@ async def reqNotebooks(req: Request):
         if os.path.isdir(path_converted):
             dirs = list(map(replacePathLocalToServer, getDirs(path_converted)))
             files = list(map(replacePathLocalToServer, getFiles(path_converted, '.ipynb')))
+
+            dirs.sort()
+            files.sort()
+
             return web.json_response({
                 'directories': dirs,
                 'files': files
@@ -202,9 +209,15 @@ async def reqJsons(req: Request):
         files_res = list(map(replacePathLocalToServer, getFiles(resultsDir, '.jsonl')))
         files_note = list(map(replacePathLocalToServer, getFiles(notebooksDir, '.jsonl')))
 
+        dirs = list({*dirs_note, *dirs_res})
+        files = list({*files_note, *files_res})
+            
+        dirs.sort()
+        files.sort()
+
         return web.json_response({
-            'directories': list({*dirs_note, *dirs_res}),
-            'files': list({*files_note, *files_res})
+            'directories': dirs,
+            'files': files
         })
     
     try:
@@ -215,6 +228,75 @@ async def reqJsons(req: Request):
         if os.path.isdir(path_converted):
             dirs = list(map(replacePathLocalToServer, getDirs(path_converted)))
             files = list(map(replacePathLocalToServer, getFiles(path_converted, '.jsonl')))
+            
+            dirs.sort()
+            files.sort()
+
+            return web.json_response({
+                'directories': dirs,
+                'files': files
+            })
+        else:
+            return web.HTTPNotFound()
+
+    return web.json_response({
+        'directories': [],
+        'files': []
+    })
+
+async def req_files(req: Request):
+    """
+    ---
+    description: This end-point allows to get files and directories. Query requires path to directory in which files and directories is searched.
+    tags:
+    - File operation
+    produces:
+    - application/json
+    responses:
+        "200":
+            description: successful operation. Return dictionary of available directories/files.
+        "404":
+            description: failed operation when queried directory doesn't exist or requested path didn't start with ./results or ./notebooks.
+    """
+    global logger
+    path_arg = req.rel_url.query.get('path', '')
+    logger.info('/files/all?path={path}'.format(path=str(path_arg)))
+
+    if path_arg == '':
+        dirs_res = []
+        dirs_note = []
+        if os.path.isdir(resultsDir):
+            dirs_res = list(map(replacePathLocalToServer, getDirs(resultsDir)))
+
+        if os.path.isdir(notebooksDir):
+            dirs_note = list(map(replacePathLocalToServer, getDirs(notebooksDir)))
+
+        files_res = list(map(replacePathLocalToServer, getFiles(resultsDir, '')))
+        files_note = list(map(replacePathLocalToServer, getFiles(notebooksDir, '')))
+
+        dirs = list({*dirs_note, *dirs_res})
+        files = list({*files_note, *files_res})
+
+        dirs.sort()
+        files.sort()
+
+        return web.json_response({
+            'directories': dirs,
+            'files': files
+        })
+    
+    try:
+        path_converted = replacePathServerToLocal(path_arg)
+    except:
+        return web.HTTPNotFound(reason="Requested path didn't start with ./results or ./notebooks")
+    if path_arg:
+        if os.path.isdir(path_converted):
+            dirs = list(map(replacePathLocalToServer, getDirs(path_converted)))
+            files = list(map(replacePathLocalToServer, getFiles(path_converted, '')))
+            
+            dirs.sort()
+            files.sort()
+
             return web.json_response({
                 'directories': dirs,
                 'files': files
@@ -283,6 +365,28 @@ async def launch_notebook(input_path, arguments, file_name, task_id):
         logger.info(f'ended launch notebook {input_path} with {arguments} spent_time {spent_time} sec')
 
 
+def convert_parameter(parameter, notebook_path):
+    parameter_type = parameter.get('type')
+    parameter_value = parameter.get('value')
+    
+    match parameter_type:
+        case 'file path':
+            try:
+                parameter_path = replacePathServerToLocal(parameter_value)
+            except:
+                raise Exception(
+                    "Parameter {name} of type={type} with value={value} didn't start with ./notebooks or ./results"
+                    .format(name=parameter.get('name'), type=parameter_type, value=parameter_value)
+                    )
+
+            relative_path = os.path.relpath(parameter_path, notebook_path[:notebook_path.rfind('/')])
+
+            return relative_path
+        case _:
+            return parameter_value
+
+
+
 async def req_launch(req: Request):
     """
     ---
@@ -320,7 +424,13 @@ async def req_launch(req: Request):
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S-%f")
     file_name = notebook_name + '_' + timestamp
     output_path = resultsDir + '/%s.jsonl' % str(file_name)
-    parameters = await req.json()
+    req_json = await req.json()
+    parameters = {}
+    for key, parameter in req_json.items():
+        try:
+            parameters[key] = convert_parameter(parameter, path_converted)
+        except Exception as error:
+            return web.HTTPInternalServerError(reason=str(error))
     parameters['output_path'] = output_path
     task_id = str(uuid4())
     job = spawn(req, launch_notebook(path_converted, parameters, file_name, task_id))
@@ -444,6 +554,7 @@ if __name__ == '__main__':
     app.router.add_route('GET', "/status", reqStatus)
     app.router.add_route('GET', "/files/notebooks", reqNotebooks)
     app.router.add_route('GET', "/files/results", reqJsons)
+    app.router.add_route('GET', "/files/all", req_files)
     app.router.add_route('GET', "/files", reqArguments)
     app.router.add_route('GET', "/file", req_file)
     app.router.add_route('POST', "/execute", req_launch)

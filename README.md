@@ -109,12 +109,16 @@ docker compose build
 
 * added `/file` request for loading content of single jsonl file
 * removed ability to get any file from machine via `/file` REST APIs
+* added sorting on requests `/files/notebooks` and `/files/results`
+* added `/files/all` request to list all files in `/notebooks` and `/results/` directories
+* added `convert_parameter` function for parsing parameter depending on it's type
 * update local run with jupyter-notebook:
   * updated th2-rpt-viewer:
     * added option to change default view type of result group
     * added display of #display-table field in Table view type
     * added option to view last N results of Notebook
     * added validation of Notebook's parameters
+    * added timestamp and file path parameter types
     * fixed clearing of Notebook's parameters on run
     * increased width of parameters' inputs
   * updated compose:
