@@ -83,7 +83,7 @@ You can put required files for you jupyter notebooks into `local-run/with-jupyte
 Or you can mount own folder by changing value of `USER_DATA_DIR` environment variable in the `local-run/with-jupyter-notebook/.evn` file.<br>
 Or change the `local-run/with-jupyter-notebook/compose.yml` file. Please note you should mount the same dictionary by the same path to `jupyter_notebook` and `json_stream_provider` services.
 
-### provide permission for `local-run/with-jupyter-notebook/user_data` folder
+#### provide permission for `local-run/with-jupyter-notebook/user_data` folder
 `jupyter-notebook` and `json-stream-provider` use user from default linux `users` group. 
 It means that:
 * `user_data` folder internal folder should have `rwx` permission for `users` group.
