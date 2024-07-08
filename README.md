@@ -1,4 +1,4 @@
-# th2-json-stream-provider (j-sp) (0.0.3)
+# th2-json-stream-provider (j-sp) (0.0.5)
 
 This python server is made to launch Jupyter notebooks (*.ipynb) and get results from them.
 
@@ -83,6 +83,20 @@ You can put required files for you jupyter notebooks into `local-run/with-jupyte
 Or you can mount own folder by changing value of `USER_DATA_DIR` environment variable in the `local-run/with-jupyter-notebook/.evn` file.<br>
 Or change the `local-run/with-jupyter-notebook/compose.yml` file. Please note you should mount the same dictionary by the same path to `jupyter_notebook` and `json_stream_provider` services.
 
+#### provide permission for `local-run/with-jupyter-notebook/user_data` folder
+`jupyter-notebook` and `json-stream-provider` use user from default linux `users` group. 
+It means that:
+* `user_data` folder internal folder should have `rwx` permission for `users` group.
+* files in `user_data` folder should have `rw` permission for `users` group.
+
+Perhaps you will need sudo permission for the next commands
+
+```shell
+cd local-run/with-jupyter-notebook
+chgrp -R users user_data/
+chmod -R g=u user_data/
+```
+
 #### start command
 ```shell
 cd local-run/with-jupyter-notebook
@@ -104,6 +118,26 @@ docker compose build
   ```
 
 ## Release notes:
+
+### 0.0.5
+
+* added `umask 0007` to `~/.bashrc` file to provide rw file access for `users` group 
+* added `/file` request for loading content of single jsonl file
+* removed ability to get any file from machine via `/file` REST APIs
+* added sorting on requests `/files/notebooks` and `/files/results`
+* added `/files/all` request to list all files in `/notebooks` and `/results/` directories
+* added `convert_parameter` function for parsing parameter depending on it's type
+* update local run with jupyter-notebook:
+  * updated th2-rpt-viewer:
+    * added option to change default view type of result group
+    * added display of #display-table field in Table view type
+    * added option to view last N results of Notebook
+    * added validation of Notebook's parameters
+    * added timestamp and file path parameter types
+    * fixed clearing of Notebook's parameters on run
+    * increased width of parameters' inputs
+  * updated compose:
+    * changed use data access from `ro` to `rw`
 
 ### 0.0.4
 
