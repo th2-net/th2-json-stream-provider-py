@@ -26,7 +26,7 @@ services:
       - th2_network
 
   th2_rpt_viewer:
-    image: ghcr.io/th2-net/th2-rpt-viewer:5.2.8-th2-5212-9834479005
+    image: ghcr.io/th2-net/th2-rpt-viewer:5.2.8-th2-5212-9836473151
     ports:
       - "8083:8080"
     networks:
