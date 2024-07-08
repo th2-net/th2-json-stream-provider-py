@@ -9,9 +9,7 @@ COPY . /app
 # groupadd --system - create a system account
 # useradd --system - create a system account
 # useradd --gid - name or ID of the primary group of the new account
-# usermod --append - append the user to the supplemental GROUPS mentioned by the -G/--groups option without removing the user from other groups
-# usermod --groups - new list of supplementary GROUPS
-RUN groupadd --system json-stream && useradd --system --gid json-stream --uid 1000 json-stream && usermod --append --groups users json-stream
+RUN useradd --system --gid users --uid 1000 json-stream
 
 ENV TH2_CFG_DIR="/app/var/th2/config/"
 ENV HOME="/home/json-stream"
@@ -41,6 +39,7 @@ ENV PYTHONPATH="${PYTHONPATH}:${PYTHON_LOCAL_LIB_PATH}:${PYTHON_SHARED_LIB_PATH}
 ENV PIP_CONFIG_FILE="${HOME}/.pip/pip.conf"
 
 RUN mkdir -p "${PYTHON_SHARED_LIB_PATH}"
+RUN echo 'umask 0007' >> "${HOME}/.bashrc"
 
 ENTRYPOINT ["python", "/app/server.py"]
 CMD ["/var/th2/config/custom.json"]
