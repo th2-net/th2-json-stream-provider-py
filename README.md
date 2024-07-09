@@ -119,6 +119,13 @@ docker compose build
 
 ## Release notes:
 
+### 0.0.6
+
+* Added papermill custom engine to reuse it for notebook execution
+* update local run with jupyter-notebook:
+  * updated th2-rpt-viewer:
+    * `JSON Reader` page pulls execution status each 50 ms instead of 1 sec
+
 ### 0.0.5
 
 * added `umask 0007` to `~/.bashrc` file to provide rw file access for `users` group 

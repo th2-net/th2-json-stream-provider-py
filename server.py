@@ -1,16 +1,16 @@
-# Copyright 2024 Exactpro (Exactpro Systems Limited)
+#  Copyright 2024 Exactpro (Exactpro Systems Limited)
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 
 import asyncio
 import json
@@ -25,7 +25,8 @@ from aiohttp.web_request import Request
 from aiohttp_swagger import *
 from aiojobs.aiohttp import setup, spawn
 
-from log_configuratior import configureLogging
+from custom_engine import ENGINE_NAME
+from log_configuratior import configure_logging
 
 os.system('pip list')
 
@@ -35,8 +36,9 @@ results_dir: str = '/home/jupyter-notebook/results/'
 log_dir: str = '/home/jupyter-notebook/logs/'
 tasks: dict = {}
 
-configureLogging()
+configure_logging()
 logger: logging.Logger = logging.getLogger('j-sp')
+
 
 def create_dir(path: str):
     if not os.path.exists(path):
@@ -56,7 +58,7 @@ def read_config(path: str):
         if notebooks_dir:
             create_dir(notebooks_dir)
         results_dir = result.get('results', results_dir)
-        logger.info('results_dir=%s',results_dir)
+        logger.info('results_dir=%s', results_dir)
         if results_dir:
             create_dir(results_dir)
         log_dir = result.get('logs', log_dir)
@@ -86,12 +88,14 @@ async def req_status(req: Request):
 def get_dirs(path):
     return [f.path for f in os.scandir(path) if f.is_dir() and f.name[0] != '.']
 
+
 def get_files(path, type):
     return [f.path for f in os.scandir(path) if f.is_file() and f.name.endswith(type) and f.name[0] != '.']
 
 
 def replace_slashes(path: str):
     return path.replace('\\', '/')
+
 
 def replace_local_to_server(path: str):
     if path.startswith(notebooks_dir):
@@ -140,12 +144,12 @@ async def req_notebooks(req: Request):
             'directories': dirs,
             'files': files
         })
-    
+
     try:
         path_converted = replace_server_to_local(path_arg)
     except:
         return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
-    
+
     if path_arg:
         if os.path.isdir(path_converted):
             dirs = list(map(replace_local_to_server, get_dirs(path_converted)))
@@ -160,7 +164,7 @@ async def req_notebooks(req: Request):
             })
         else:
             return web.HTTPNotFound()
-    
+
     return web.json_response({
         'directories': [],
         'files': []
@@ -199,7 +203,7 @@ async def req_jsons(req: Request):
 
         dirs = list({*dirs_note, *dirs_res})
         files = list({*files_note, *files_res})
-            
+
         dirs.sort()
         files.sort()
 
@@ -207,7 +211,7 @@ async def req_jsons(req: Request):
             'directories': dirs,
             'files': files
         })
-    
+
     try:
         path_converted = replace_server_to_local(path_arg)
     except:
@@ -216,7 +220,7 @@ async def req_jsons(req: Request):
         if os.path.isdir(path_converted):
             dirs = list(map(replace_local_to_server, get_dirs(path_converted)))
             files = list(map(replace_local_to_server, get_files(path_converted, '.jsonl')))
-            
+
             dirs.sort()
             files.sort()
 
@@ -231,6 +235,7 @@ async def req_jsons(req: Request):
         'directories': [],
         'files': []
     })
+
 
 async def req_files(req: Request):
     """
@@ -272,7 +277,7 @@ async def req_files(req: Request):
             'directories': dirs,
             'files': files
         })
-    
+
     try:
         path_converted = replace_server_to_local(path_arg)
     except:
@@ -281,7 +286,7 @@ async def req_files(req: Request):
         if os.path.isdir(path_converted):
             dirs = list(map(replace_local_to_server, get_dirs(path_converted)))
             files = list(map(replace_local_to_server, get_files(path_converted, '')))
-            
+
             dirs.sort()
             files.sort()
 
@@ -334,7 +339,12 @@ async def launch_notebook(input_path, arguments, file_name, task_id):
     try:
         with pm.utils.chdir(input_path[:input_path.rfind('/')]):
             input_path = input_path[input_path.rfind('/') + 1:]
-            pm.execute_notebook(input_path, log_out, arguments)
+            pm.execute_notebook(
+                input_path=input_path,
+                output_path=log_out,
+                parameters=arguments,
+                engine_name=ENGINE_NAME,  # FIXME: use a separate engine for each UI user to avoid clash
+            )
             logger.debug(f'successfully launched notebook {input_path}')
             if tasks.get(task_id):
                 tasks[task_id] = {
@@ -363,12 +373,12 @@ def convert_parameter(parameter, notebook_path):
             raise Exception(
                 "Parameter {name} of type={type} with value={value} didn't start with ./notebooks or ./results"
                 .format(name=parameter.get('name'), type=parameter_type, value=parameter_value)
-                )
+            )
 
         relative_path = os.path.relpath(parameter_path, notebook_path[:notebook_path.rfind('/')])
 
         return relative_path
-    
+
     else:
         return parameter_value
 
@@ -446,7 +456,7 @@ async def req_file(req: Request):
     global logger
     path = req.rel_url.query.get('path', '')
     logger.info('/file?path={path}'.format(path=str(path)))
-    path_converted = replace_server_to_local(path)    
+    path_converted = replace_server_to_local(path)
     try:
         path_converted = replace_server_to_local(path)
     except:
@@ -457,6 +467,7 @@ async def req_file(req: Request):
     content = file.read()
     file.close()
     return web.json_response({'result': content})
+
 
 async def reqResult(req: Request):
     """
@@ -488,18 +499,19 @@ async def reqResult(req: Request):
     if status == 'in progress':
         return web.json_response({'status': status})
     elif status == 'success':
-        path_param = task.get('result','')
+        path_param = task.get('result', '')
         if not path_param or not os.path.isfile(path_param):
             return web.HTTPNotFound(reason="Resulting file doesn't exist")
         file = open(path_param, "r")
         content = file.read()
         file.close()
-        return web.json_response({'status': status, 'result': content, 'path': replace_local_to_server(path_param) })
+        return web.json_response({'status': status, 'result': content, 'path': replace_local_to_server(path_param)})
     elif status == 'failed':
         error = task.get('result', Exception())
         return web.json_response({'status': status, 'result': str(error)})
     else:
         return web.HTTPNotFound()
+
 
 async def req_stop(req: Request):
     """
@@ -526,6 +538,7 @@ async def req_stop(req: Request):
     except:
         return web.HTTPInternalServerError(reason='failed to stop process')
     return web.HTTPOk()
+
 
 if __name__ == '__main__':
     parser = ArgumentParser()
