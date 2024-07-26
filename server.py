@@ -375,10 +375,7 @@ def convert_parameter(parameter, notebook_path):
                 .format(name=parameter.get('name'), type=parameter_type, value=parameter_value)
             )
 
-        relative_path = os.path.relpath(parameter_path, notebook_path[:notebook_path.rfind('/')])
-
-        return relative_path
-
+        return parameter_path
     else:
         return parameter_value
 
