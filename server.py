@@ -349,7 +349,8 @@ async def launch_notebook(input_path, arguments, file_name, task_id):
             if tasks.get(task_id):
                 tasks[task_id] = {
                     'status': 'success',
-                    'result': arguments.get('output_path')
+                    'result': arguments.get('output_path'),
+                    'customization': arguments.get('customization_path')
                 }
     except Exception as error:
         logger.error(f'failed to launch notebook {input_path}', error)
@@ -417,6 +418,7 @@ async def req_launch(req: Request):
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S-%f")
     file_name = notebook_name + '_' + timestamp
     output_path = results_dir + '/%s.jsonl' % str(file_name)
+    customization_path = results_dir + '/%s.json' % str(file_name)
     req_json = await req.json()
     parameters = {}
     for key, parameter in req_json.items():
@@ -425,6 +427,7 @@ async def req_launch(req: Request):
         except Exception as error:
             return web.HTTPInternalServerError(reason=str(error))
     parameters['output_path'] = output_path
+    parameters['customization_path'] = customization_path
     task_id = str(uuid4())
     job = spawn(req, launch_notebook(path_converted, parameters, file_name, task_id))
     tasks[task_id] = {
@@ -466,7 +469,7 @@ async def req_file(req: Request):
     return web.json_response({'result': content})
 
 
-async def reqResult(req: Request):
+async def req_result(req: Request):
     """
     ---
     description: This end-point allows to get result from requested task. Query requires task id from which result is required.
@@ -499,10 +502,16 @@ async def reqResult(req: Request):
         path_param = task.get('result', '')
         if not path_param or not os.path.isfile(path_param):
             return web.HTTPNotFound(reason="Resulting file doesn't exist")
+        customization_param = task.get('customization', '')
+        customization = "[]"
+        if len(customization_param) > 0 and os.path.isfile(customization_param):
+            customization_file = open(customization_param, "r")
+            customization = customization_file.read();
+            customization_file.close()
         file = open(path_param, "r")
         content = file.read()
         file.close()
-        return web.json_response({'status': status, 'result': content, 'path': replace_local_to_server(path_param)})
+        return web.json_response({'status': status, 'result': content, 'customization': customization, 'path': replace_local_to_server(path_param)})
     elif status == 'failed':
         error = task.get('result', Exception())
         return web.json_response({'status': status, 'result': str(error)})
@@ -554,7 +563,7 @@ if __name__ == '__main__':
     app.router.add_route('GET', "/files", req_parameters)
     app.router.add_route('GET', "/file", req_file)
     app.router.add_route('POST', "/execute", req_launch)
-    app.router.add_route('GET', "/result", reqResult)
+    app.router.add_route('GET', "/result", req_result)
     app.router.add_route('POST', "/stop", req_stop)
     setup_swagger(app)
     logger.info('starting server')
