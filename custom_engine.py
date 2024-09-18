@@ -12,17 +12,46 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging.config
+import time
+
 from papermill.clientwrap import PapermillNotebookClient
-from papermill.engines import papermill_engines, NBClientEngine
+from papermill.engines import NBClientEngine
 from papermill.utils import remove_args, merge_kwargs, logger
 
-ENGINE_NAME = 'nbclient_reusable'
+
+class MetadataKey:
+    def __init__(self, client_id, notebook_file):
+        self.client_id = client_id
+        self.notebook_file = notebook_file
+
+    def __hash__(self):
+        # Combine attributes for a unique hash
+        return hash((self.client_id, self.notebook_file))
+
+    def __eq__(self, other):
+        if isinstance(other, MetadataKey):
+            return self.client_id == other.client_id and self.notebook_file == other.notebook_file
+        return False
+
+    def __iter__(self):
+        return iter((self.client_id, self.notebook_file))
+
+    def __str__(self):
+        return f"{self.client_id}:{self.notebook_file}"
+
+
+class EngineMetadata:
+    client: PapermillNotebookClient = None
+    last_used_time: float = time.time()
 
 
 # this file has been copied from the issue comment
 # https://github.com/nteract/papermill/issues/583#issuecomment-791988091
 class CustomEngine(NBClientEngine):
-    client = None
+    out_of_use_engine_time: int = 60 * 60
+    metadata_dict: dict = {}
+    logger: logging.Logger
 
     @classmethod
     def renumber_executions(cls, nb):
@@ -68,16 +97,49 @@ class CustomEngine(NBClientEngine):
             stdout_file=stdout_file,
             stderr_file=stderr_file,
         )
-        if not cls.client:
-            cls.client = PapermillNotebookClient(nb_man, **final_kwargs)
+        # TODO: pass client_id
+        key = MetadataKey("", nb_man.nb['metadata']['papermill']['input_path'])
+        metadata = cls.get_engine_metadata(key)
+        if metadata.client is None:
+            metadata.client = PapermillNotebookClient(nb_man, **final_kwargs)
+            cls.logger.info(f"Created papermill notebook client for {key}")
+
         # accept new notebook into (possibly) existing client
-        cls.client.nb_man = nb_man
-        cls.client.nb = nb_man.nb
+        metadata.client.nb_man = nb_man
+        metadata.client.nb = nb_man.nb
         # reuse client connection to existing kernel
-        output = cls.client.execute(cleanup_kc=False)
+        output = metadata.client.execute(cleanup_kc=False)
         cls.renumber_executions(nb_man.nb)
 
         return output
 
+    @classmethod
+    def create_logger(cls):
+        cls.logger = logging.getLogger('engine')
 
-papermill_engines.register(ENGINE_NAME, CustomEngine)
+    @classmethod
+    def set_out_of_use_engine_time(cls, value: int):
+        cls.out_of_use_engine_time = value
+
+    @classmethod
+    def get_engine_metadata(cls, key: MetadataKey):
+        cls.remove_out_of_date_engines(key)
+        metadata: EngineMetadata
+        if key not in cls.metadata_dict:
+            metadata = EngineMetadata()
+            cls.metadata_dict[key] = metadata
+        else:
+            metadata = cls.metadata_dict[key]
+        return metadata
+
+    @classmethod
+    def remove_out_of_date_engines(cls, exclude_key: MetadataKey):
+        now = time.time()
+        dead_line = now - cls.out_of_use_engine_time
+        out_of_use_engines = [key for key, metadata in cls.metadata_dict.items() if
+                              key != exclude_key and metadata.last_used_time < dead_line]
+        for key in out_of_use_engines:
+            metadata: EngineMetadata = cls.metadata_dict.pop(key)
+            metadata.client = None
+            cls.logger.info(
+                f"Unregistered '{key}' papermill engine, last used time {now - metadata.last_used_time} sec ago")

@@ -9,6 +9,7 @@ This python server is made to launch Jupyter notebooks (*.ipynb) and get results
 * `notebooks` (Default value: /home/jupyter-notebook/) - path to the directory with notebooks. `j-sp` search files with `ipynb` extension recursively in the specified folder.
 * `results` (Default value: /home/jupyter-notebook/results) - path to the directory for run results. `j-sp` resolves result file with `jsonl` extension against specified folder.
 * `logs` (Default value: /home/jupyter-notebook/logs) - path to the directory for run logs. `j-sp` puts run logs to specified folder.
+* `out-of-use-engine-time` (Default value: 3600) - out-of-use time interval in seconds. `j-sp` unregisters engine related to a notebook when user doesn't run the notebook more than this time
 
 ### mounting:
 
@@ -37,6 +38,7 @@ spec:
     notebooks: /home/jupyter-notebook/
     results: /home/jupyter-notebook/j-sp/results/
     logs: /home/jupyter-notebook/j-sp/logs/
+    out-of-use-engine-time: 3600
   mounting:
     - path: /home/jupyter-notebook/
       pvcName: jupyter-notebook
@@ -121,7 +123,8 @@ docker compose build
 
 ### 0.0.6
 
-* Added papermill custom engine to reuse it for notebook execution
+* Added papermill custom engine to reuse it for notebook execution.
+  A separate engine is registered for each notebook and unregistered after 1 hour out-of-use time by default.
 * update local run with jupyter-notebook:
   * updated th2-rpt-viewer:
     * `JSON Reader` page pulls execution status each 50 ms instead of 1 sec

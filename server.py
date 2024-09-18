@@ -18,14 +18,17 @@ import logging.config
 import os
 from argparse import ArgumentParser
 from datetime import datetime, timezone
+from typing import Coroutine, Any
 
 import papermill as pm
 from aiohttp import web
 from aiohttp.web_request import Request
 from aiohttp_swagger import *
+from aiojobs import Job
 from aiojobs.aiohttp import setup, spawn
+from papermill.engines import papermill_engines
 
-from custom_engine import ENGINE_NAME
+from custom_engine import CustomEngine
 from log_configuratior import configure_logging
 
 os.system('pip list')
@@ -34,10 +37,31 @@ server_status: str = 'ok'
 notebooks_dir: str = '/home/jupyter-notebook/'
 results_dir: str = '/home/jupyter-notebook/results/'
 log_dir: str = '/home/jupyter-notebook/logs/'
+
 tasks: dict = {}
 
 configure_logging()
+CustomEngine.create_logger()
+papermill_engines.register(None, CustomEngine)
 logger: logging.Logger = logging.getLogger('j-sp')
+
+
+class Task:
+    status: str = 'unknown'
+    result = ''
+    customization: str = ''
+    job: Coroutine[Any, Any, Job[None]] = None
+
+    def __init__(self, status: str, result = '', customization: str = '',
+                 job: Coroutine[Any, Any, Job[None]] = None):
+        self.status = status
+        self.result = result
+        self.customization = customization
+        self.job = job
+
+    def close_job(self) -> None:
+        if self.job is not None:
+            self.job.close()
 
 
 def create_dir(path: str):
@@ -52,19 +76,24 @@ def read_config(path: str):
     global logger
     try:
         file = open(path, "r")
-        result = json.load(file)
-        notebooks_dir = result.get('notebooks', notebooks_dir)
+        cfg = json.load(file)
+
+        notebooks_dir = cfg.get('notebooks', notebooks_dir)
         logger.info('notebooks_dir=%s', notebooks_dir)
         if notebooks_dir:
             create_dir(notebooks_dir)
-        results_dir = result.get('results', results_dir)
+
+        results_dir = cfg.get('results', results_dir)
         logger.info('results_dir=%s', results_dir)
         if results_dir:
             create_dir(results_dir)
-        log_dir = result.get('logs', log_dir)
+
+        log_dir = cfg.get('logs', log_dir)
         logger.info('log_dir=%s', log_dir)
         if log_dir:
             create_dir(log_dir)
+
+        CustomEngine.set_out_of_use_engine_time(cfg.get('out-of-use-engine-time', CustomEngine.out_of_use_engine_time))
     except Exception as e:
         logger.error(f"Read '{path}' configuration failure", e)
 
@@ -89,8 +118,8 @@ def get_dirs(path):
     return [f.path for f in os.scandir(path) if f.is_dir() and f.name[0] != '.']
 
 
-def get_files(path, type):
-    return [f.path for f in os.scandir(path) if f.is_file() and f.name.endswith(type) and f.name[0] != '.']
+def get_files(path, file_type):
+    return [f.path for f in os.scandir(path) if f.is_file() and f.name.endswith(file_type) and f.name[0] != '.']
 
 
 def replace_slashes(path: str):
@@ -117,7 +146,8 @@ def replace_server_to_local(path: str):
 async def req_notebooks(req: Request):
     """
     ---
-    description: This end-point allows to get notebooks that could be requested. Query requires path to directory in which notebooks is searched.
+    description: This end-point allows to get notebooks that could be requested.
+      Query requires path to directory in which notebooks is searched.
     tags:
     - File operation
     produces:
@@ -126,7 +156,8 @@ async def req_notebooks(req: Request):
         "200":
             description: successful operation. Return dictionary of available directories/files.
         "404":
-            description: failed operation when queried directory doesn't exist or requested path didn't start with ./notebooks.
+            description: failed operation when queried directory doesn't exist
+              or requested path didn't start with ./notebooks.
     """
     global logger
     path_arg = req.rel_url.query.get('path', '')
@@ -147,7 +178,8 @@ async def req_notebooks(req: Request):
 
     try:
         path_converted = replace_server_to_local(path_arg)
-    except:
+    except Exception as error:
+        logger.warning("Requested path didn't start with ./notebooks", error)
         return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
 
     if path_arg:
@@ -174,7 +206,8 @@ async def req_notebooks(req: Request):
 async def req_jsons(req: Request):
     """
     ---
-    description: This end-point allows to get jsonls that could be requested. Query requires path to directory in which jsonls is searched.
+    description: This end-point allows to get JSONLs that could be requested.
+      Query requires path to directory in which JSONLs is searched.
     tags:
     - File operation
     produces:
@@ -183,7 +216,8 @@ async def req_jsons(req: Request):
         "200":
             description: successful operation. Return dictionary of available directories/files.
         "404":
-            description: failed operation when queried directory doesn't exist or requested path didn't start with ./results or ./notebooks.
+            description: failed operation when queried directory doesn't exist
+              or requested path didn't start with ./results or ./notebooks.
     """
     global logger
     path_arg = req.rel_url.query.get('path', '')
@@ -214,7 +248,8 @@ async def req_jsons(req: Request):
 
     try:
         path_converted = replace_server_to_local(path_arg)
-    except:
+    except Exception as error:
+        logger.warning("Requested path didn't start with ./results or ./notebooks", error)
         return web.HTTPNotFound(reason="Requested path didn't start with ./results or ./notebooks")
     if path_arg:
         if os.path.isdir(path_converted):
@@ -240,7 +275,8 @@ async def req_jsons(req: Request):
 async def req_files(req: Request):
     """
     ---
-    description: This end-point allows to get files and directories. Query requires path to directory in which files and directories is searched.
+    description: This end-point allows to get files and directories.
+      Query requires path to directory in which files and directories is searched.
     tags:
     - File operation
     produces:
@@ -249,7 +285,8 @@ async def req_files(req: Request):
         "200":
             description: successful operation. Return dictionary of available directories/files.
         "404":
-            description: failed operation when queried directory doesn't exist or requested path didn't start with ./results or ./notebooks.
+            description: failed operation when queried directory doesn't exist
+              or requested path didn't start with ./results or ./notebooks.
     """
     global logger
     path_arg = req.rel_url.query.get('path', '')
@@ -280,7 +317,8 @@ async def req_files(req: Request):
 
     try:
         path_converted = replace_server_to_local(path_arg)
-    except:
+    except Exception as error:
+        logger.warning("Requested path didn't start with ./results or ./notebooks", error)
         return web.HTTPNotFound(reason="Requested path didn't start with ./results or ./notebooks")
     if path_arg:
         if os.path.isdir(path_converted):
@@ -306,7 +344,8 @@ async def req_files(req: Request):
 async def req_parameters(req: Request):
     """
     ---
-    description: This end-point allows to get parameters for notebook in requested path. Query requires path to notebook.
+    description: This end-point allows to get parameters for notebook in requested path.
+      Query requires path to notebook.
     tags:
     - File operation
     produces:
@@ -315,14 +354,16 @@ async def req_parameters(req: Request):
         "200":
             description: successful operation. Return json of file's parameters.
         "404":
-            description: failed operation when queried file doesn't exist or requested path didn't start with ./notebooks.
+            description: failed operation when queried file doesn't exist
+              or requested path didn't start with ./notebooks.
     """
     global logger
     path = req.rel_url.query.get('path', '')
     logger.info('/files?path={path}'.format(path=str(path)))
     try:
         path_converted = replace_server_to_local(path)
-    except:
+    except Exception as error:
+        logger.warning("Requested path didn't start with ./notebooks", error)
         return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
     if not path or not os.path.isfile(path_converted):
         return web.HTTPNotFound()
@@ -330,7 +371,7 @@ async def req_parameters(req: Request):
     return web.json_response(params)
 
 
-async def launch_notebook(input_path, arguments, file_name, task_id):
+async def launch_notebook(input_path, arguments: dict, file_name, task_id):
     global tasks
     global logger
     logger.info(f'launching notebook {input_path} with {arguments}')
@@ -343,22 +384,21 @@ async def launch_notebook(input_path, arguments, file_name, task_id):
                 input_path=input_path,
                 output_path=log_out,
                 parameters=arguments,
-                engine_name=ENGINE_NAME,  # FIXME: use a separate engine for each UI user to avoid clash
             )
             logger.debug(f'successfully launched notebook {input_path}')
             if tasks.get(task_id):
-                tasks[task_id] = {
-                    'status': 'success',
-                    'result': arguments.get('output_path'),
-                    'customization': arguments.get('customization_path')
-                }
+                tasks[task_id] = Task(
+                    status='success',
+                    result=arguments.get('output_path'),
+                    customization=arguments.get('customization_path'),
+                )
     except Exception as error:
         logger.error(f'failed to launch notebook {input_path}', error)
         if tasks.get(task_id):
-            tasks[task_id] = {
-                'status': 'failed',
-                'result': error
-            }
+            tasks[task_id] = Task(
+                status='failed',
+                result=error
+            )
     finally:
         spent_time = (datetime.now() - start_execution).total_seconds()
         logger.info(f'ended launch notebook {input_path} with {arguments} spent_time {spent_time} sec')
@@ -367,7 +407,7 @@ async def launch_notebook(input_path, arguments, file_name, task_id):
 def convert_parameter(parameter, notebook_path):
     parameter_type = parameter.get('type')
     parameter_value = parameter.get('value')
-    if (parameter_type == 'file path'):
+    if parameter_type == 'file path':
         try:
             parameter_path = replace_server_to_local(parameter_value)
         except:
@@ -384,7 +424,8 @@ def convert_parameter(parameter, notebook_path):
 async def req_launch(req: Request):
     """
     ---
-    description: This end-point allows to start notebook. Query requires path to notebook. Body requred to be dictionary of parameters.
+    description: This end-point allows to start notebook. Query requires path to notebook.
+      Body required to be dictionary of parameters.
     tags:
     - Execution operation
     produces:
@@ -408,7 +449,8 @@ async def req_launch(req: Request):
         return web.HTTPBadRequest(reason='Body with parameters not present')
     try:
         path_converted = replace_server_to_local(path_arg)
-    except:
+    except Exception as error:
+        logger.warning("Requested path didn't start with ./notebooks", error)
         return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
     if not path_arg or not os.path.isfile(path_converted):
         return web.HTTPNotFound()
@@ -429,11 +471,11 @@ async def req_launch(req: Request):
     parameters['output_path'] = output_path
     parameters['customization_path'] = customization_path
     task_id = str(uuid4())
-    job = spawn(req, launch_notebook(path_converted, parameters, file_name, task_id))
-    tasks[task_id] = {
-        'status': 'in progress',
-        'job': job
-    }
+    job: Coroutine[Any, Any, Job[None]] = spawn(req, launch_notebook(path_converted, parameters, file_name, task_id))
+    tasks[task_id] = Task(
+        status='in progress',
+        job=job
+    )
     asyncio.shield(job)
     return web.json_response({'task_id': task_id})
 
@@ -450,16 +492,17 @@ async def req_file(req: Request):
         "200":
             description: successful operation. Return file's json.
         "404":
-            description: failed operation. requested file doesn't exist or requested path didn't start with ./results or ./notebooks.
+            description: failed operation. requested file doesn't exist
+              or requested path didn't start with ./results or ./notebooks.
     """
     global tasks
     global logger
     path = req.rel_url.query.get('path', '')
     logger.info('/file?path={path}'.format(path=str(path)))
-    path_converted = replace_server_to_local(path)
     try:
         path_converted = replace_server_to_local(path)
-    except:
+    except Exception as error:
+        logger.warning("Requested path didn't start with ./results or ./notebooks", error)
         return web.HTTPNotFound(reason="Requested path didn't start with ./results or ./notebooks")
     if not path or not os.path.isfile(path_converted):
         return web.HTTPNotFound()
@@ -472,7 +515,8 @@ async def req_file(req: Request):
 async def req_result(req: Request):
     """
     ---
-    description: This end-point allows to get result from requested task. Query requires task id from which result is required.
+    description: This end-point allows to get result from requested task.
+      Query requires task id from which result is required.
     tags:
     - Execution operation
     produces:
@@ -486,34 +530,36 @@ async def req_result(req: Request):
         "400":
             description: failed operation. body with parameters not present.
         "404":
-            description: failed operation. requested task doesn't exist or resulting file doesn't exist or status is unknown.
+            description: failed operation. requested task doesn't exist
+              or resulting file doesn't exist or status is unknown.
     """
     global tasks
     global logger
     task_id = req.rel_url.query.get('id')
     logger.info('/result?id={task_id}'.format(task_id=str(task_id)))
-    task = tasks.get(task_id, None)
+    task: Task = tasks.get(task_id, None)
     if task is None:
         return web.HTTPNotFound(reason="Requested task doesn't exist")
-    status = task.get('status', None)
+    status = task.status
     if status == 'in progress':
         return web.json_response({'status': status})
     elif status == 'success':
-        path_param = task.get('result', '')
+        path_param = task.result
         if not path_param or not os.path.isfile(path_param):
             return web.HTTPNotFound(reason="Resulting file doesn't exist")
-        customization_param = task.get('customization', '')
+        customization_param = task.customization
         customization = "[]"
         if len(customization_param) > 0 and os.path.isfile(customization_param):
             customization_file = open(customization_param, "r")
-            customization = customization_file.read();
+            customization = customization_file.read()
             customization_file.close()
         file = open(path_param, "r")
         content = file.read()
         file.close()
-        return web.json_response({'status': status, 'result': content, 'customization': customization, 'path': replace_local_to_server(path_param)})
+        return web.json_response({'status': status, 'result': content, 'customization': customization,
+                                  'path': replace_local_to_server(path_param)})
     elif status == 'failed':
-        error = task.get('result', Exception())
+        error: Exception = task.result
         return web.json_response({'status': status, 'result': str(error)})
     else:
         return web.HTTPNotFound()
@@ -537,11 +583,12 @@ async def req_stop(req: Request):
     global logger
     task_id = req.rel_url.query.get('id')
     logger.info('/stop?id={task_id}'.format(task_id=str(task_id)))
-    task = tasks.pop(task_id, None)
+    task: Task = tasks.pop(task_id, None)
     try:
-        if task:
-            await task.job.close()
-    except:
+        if task is not None:
+            await task.close_job()
+    except Exception as error:
+        logger.warning("failed to stop process", error)
         return web.HTTPInternalServerError(reason='failed to stop process')
     return web.HTTPOk()
 
@@ -550,7 +597,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('config')
     cfg_path = vars(parser.parse_args()).get('config')
-    if (cfg_path):
+    if cfg_path:
         read_config(cfg_path)
 
     app = web.Application()
