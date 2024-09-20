@@ -17,18 +17,21 @@ import json
 import logging.config
 import os
 from argparse import ArgumentParser
+from asyncio import Task
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Coroutine, Any
 
+import papermill_execute_ext as epm
 import papermill as pm
+from papermill.utils import chdir
 from aiohttp import web
 from aiohttp.web_request import Request
 from aiohttp_swagger import *
 from aiojobs import Job
-from aiojobs.aiohttp import setup, spawn
-from papermill.engines import papermill_engines
+from aiojobs.aiohttp import setup
 
-from custom_engine import CustomEngine
+from custom_engines import CustomEngine
 from log_configuratior import configure_logging
 
 os.system('pip list')
@@ -42,19 +45,28 @@ tasks: dict = {}
 
 configure_logging()
 CustomEngine.create_logger()
-papermill_engines.register(None, CustomEngine)
 logger: logging.Logger = logging.getLogger('j-sp')
 
 
-class Task:
-    status: str = 'unknown'
-    result = ''
+class TaskStatus(Enum):
+    CREATED = 'created'
+    SUCCESS = 'success'
+    FAILED = 'failed'
+    IN_PROGRESS = 'in progress'
+
+
+class TaskMetadata:
+    task_id: str
+    task: Task[None]
+    status: TaskStatus
+    result: Any
     customization: str = ''
     job: Coroutine[Any, Any, Job[None]] = None
 
-    def __init__(self, status: str, result = '', customization: str = '',
+    def __init__(self, task_id: str, result: Any = '', customization: str = '',
                  job: Coroutine[Any, Any, Job[None]] = None):
-        self.status = status
+        self.task_id = task_id
+        self.status = TaskStatus.CREATED
         self.result = result
         self.customization = customization
         self.job = job
@@ -98,6 +110,7 @@ def read_config(path: str):
         logger.error(f"Read '{path}' configuration failure", e)
 
 
+# noinspection PyUnusedLocal
 async def req_status(req: Request):
     """
     ---
@@ -371,50 +384,49 @@ async def req_parameters(req: Request):
     return web.json_response(params)
 
 
-async def launch_notebook(input_path, arguments: dict, file_name, task_id):
-    global tasks
+async def launch_notebook(input_path, arguments: dict, file_name, task_metadata: TaskMetadata):
     global logger
+    global tasks
     logger.info(f'launching notebook {input_path} with {arguments}')
+
+    if task_metadata is None:
+        return
+
+    task_metadata.status = TaskStatus.IN_PROGRESS
     start_execution = datetime.now()
     log_out: str = (log_dir + '/%s.log.ipynb' % file_name) if log_dir and file_name else None
     try:
-        with pm.utils.chdir(input_path[:input_path.rfind('/')]):
+        with chdir(input_path[:input_path.rfind('/')]):
             input_path = input_path[input_path.rfind('/') + 1:]
-            pm.execute_notebook(
+            await epm.async_execute_notebook(
                 input_path=input_path,
                 output_path=log_out,
                 parameters=arguments,
             )
             logger.debug(f'successfully launched notebook {input_path}')
-            if tasks.get(task_id):
-                tasks[task_id] = Task(
-                    status='success',
-                    result=arguments.get('output_path'),
-                    customization=arguments.get('customization_path'),
-                )
+            task_metadata.status = TaskStatus.SUCCESS
+            task_metadata.result = arguments.get('output_path')
+            task_metadata.customization = arguments.get('customization_path')
     except Exception as error:
         logger.error(f'failed to launch notebook {input_path}', error)
-        if tasks.get(task_id):
-            tasks[task_id] = Task(
-                status='failed',
-                result=error
-            )
+        task_metadata.status = TaskStatus.FAILED
+        task_metadata.result = error
     finally:
         spent_time = (datetime.now() - start_execution).total_seconds()
         logger.info(f'ended launch notebook {input_path} with {arguments} spent_time {spent_time} sec')
 
 
-def convert_parameter(parameter, notebook_path):
+def convert_parameter(parameter):
     parameter_type = parameter.get('type')
     parameter_value = parameter.get('value')
     if parameter_type == 'file path':
         try:
             parameter_path = replace_server_to_local(parameter_value)
-        except:
-            raise Exception(
-                "Parameter {name} of type={type} with value={value} didn't start with ./notebooks or ./results"
-                .format(name=parameter.get('name'), type=parameter_type, value=parameter_value)
-            )
+        except Exception as error:
+            msg = (f"Parameter {parameter.get('name')} of type={parameter_type} with value={parameter_value} "
+                   "didn't start with ./notebooks or ./results")
+            logger.error(msg, error)
+            raise Exception(msg, error)
 
         return parameter_path
     else:
@@ -465,18 +477,16 @@ async def req_launch(req: Request):
     parameters = {}
     for key, parameter in req_json.items():
         try:
-            parameters[key] = convert_parameter(parameter, path_converted)
+            parameters[key] = convert_parameter(parameter)
         except Exception as error:
             return web.HTTPInternalServerError(reason=str(error))
     parameters['output_path'] = output_path
     parameters['customization_path'] = customization_path
     task_id = str(uuid4())
-    job: Coroutine[Any, Any, Job[None]] = spawn(req, launch_notebook(path_converted, parameters, file_name, task_id))
-    tasks[task_id] = Task(
-        status='in progress',
-        job=job
-    )
-    asyncio.shield(job)
+    task_metadata = TaskMetadata(task_id=task_id)
+    tasks[task_id] = task_metadata
+    task: Task[None] = asyncio.create_task(launch_notebook(path_converted, parameters, file_name, task_metadata))
+    task_metadata.task = task
     return web.json_response({'task_id': task_id})
 
 
@@ -536,14 +546,14 @@ async def req_result(req: Request):
     global tasks
     global logger
     task_id = req.rel_url.query.get('id')
-    logger.info('/result?id={task_id}'.format(task_id=str(task_id)))
-    task: Task = tasks.get(task_id, None)
+    logger.debug('/result?id={task_id}'.format(task_id=str(task_id)))
+    task: TaskMetadata = tasks.get(task_id)
     if task is None:
         return web.HTTPNotFound(reason="Requested task doesn't exist")
     status = task.status
-    if status == 'in progress':
-        return web.json_response({'status': status})
-    elif status == 'success':
+    if status == TaskStatus.IN_PROGRESS:
+        return web.json_response({'status': status.value})
+    elif status == TaskStatus.SUCCESS:
         path_param = task.result
         if not path_param or not os.path.isfile(path_param):
             return web.HTTPNotFound(reason="Resulting file doesn't exist")
@@ -556,11 +566,11 @@ async def req_result(req: Request):
         file = open(path_param, "r")
         content = file.read()
         file.close()
-        return web.json_response({'status': status, 'result': content, 'customization': customization,
+        return web.json_response({'status': status.value, 'result': content, 'customization': customization,
                                   'path': replace_local_to_server(path_param)})
-    elif status == 'failed':
+    elif status == TaskStatus.FAILED:
         error: Exception = task.result
-        return web.json_response({'status': status, 'result': str(error)})
+        return web.json_response({'status': status.value, 'result': str(error)})
     else:
         return web.HTTPNotFound()
 
@@ -583,10 +593,10 @@ async def req_stop(req: Request):
     global logger
     task_id = req.rel_url.query.get('id')
     logger.info('/stop?id={task_id}'.format(task_id=str(task_id)))
-    task: Task = tasks.pop(task_id, None)
+    task: TaskMetadata = tasks.pop(task_id)
     try:
-        if task is not None:
-            await task.close_job()
+        if task and task.status == TaskStatus.IN_PROGRESS:
+            task.task.cancel("stopped by user")
     except Exception as error:
         logger.warning("failed to stop process", error)
         return web.HTTPInternalServerError(reason='failed to stop process')

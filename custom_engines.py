@@ -16,7 +16,7 @@ import logging.config
 import time
 
 from papermill.clientwrap import PapermillNotebookClient
-from papermill.engines import NBClientEngine
+from papermill.engines import NBClientEngine, NotebookExecutionManager, PapermillEngines
 from papermill.utils import remove_args, merge_kwargs, logger
 
 
@@ -46,8 +46,6 @@ class EngineMetadata:
     last_used_time: float = time.time()
 
 
-# this file has been copied from the issue comment
-# https://github.com/nteract/papermill/issues/583#issuecomment-791988091
 class CustomEngine(NBClientEngine):
     out_of_use_engine_time: int = 60 * 60
     metadata_dict: dict = {}
@@ -59,8 +57,80 @@ class CustomEngine(NBClientEngine):
             if 'execution_count' in cell:
                 cell['execution_count'] = i + 1
 
+    # The code of this method is derived from https://github.com/nteract/papermill/blob/2.6.0 under the BSD License.
+    # Original license follows:
+    #
+    # BSD 3-Clause License
+    #
+    # Copyright (c) 2017, nteract
+    # All rights reserved.
+    #
+    # Redistribution and use in source and binary forms, with or without
+    # modification, are permitted provided that the following conditions are met:
+    #
+    # * Redistributions of source code must retain the above copyright notice, this
+    #   list of conditions and the following disclaimer.
+    #
+    # * Redistributions in binary form must reproduce the above copyright notice,
+    #   this list of conditions and the following disclaimer in the documentation
+    #   and/or other materials provided with the distribution.
+    #
+    # * Neither the name of the copyright holder nor the names of its
+    #   contributors may be used to endorse or promote products derived from
+    #   this software without specific prior written permission.
+    #
+    # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+    # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+    # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+    # DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+    # FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+    # DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+    # SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+    # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+    # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+    #
+    # Modified by Exactpro for https://github.com/th2-net/th2-json-stream-provider-py
     @classmethod
-    def execute_managed_notebook(
+    async def async_execute_notebook(
+            cls,
+            nb,
+            kernel_name,
+            output_path=None,
+            progress_bar=True,
+            log_output=False,
+            autosave_cell_every=30,
+            **kwargs,
+    ):
+        """
+        A wrapper to handle notebook execution tasks.
+
+        Wraps the notebook object in a `NotebookExecutionManager` in order to track
+        execution state in a uniform manner. This is meant to help simplify
+        engine implementations. This allows a developer to just focus on
+        iterating and executing the cell contents.
+        """
+        nb_man = NotebookExecutionManager(
+            nb,
+            output_path=output_path,
+            progress_bar=progress_bar,
+            log_output=log_output,
+            autosave_cell_every=autosave_cell_every,
+        )
+
+        nb_man.notebook_start()
+        try:
+            await cls.async_execute_managed_notebook(nb_man, kernel_name, log_output=log_output, **kwargs)
+        finally:
+            nb_man.cleanup_pbar()
+            nb_man.notebook_complete()
+
+        return nb_man.nb
+
+    # this method has been copied from the issue comment
+    # https://github.com/nteract/papermill/issues/583#issuecomment-791988091
+    @classmethod
+    async def async_execute_managed_notebook(
             cls,
             nb_man,
             kernel_name,
@@ -108,7 +178,7 @@ class CustomEngine(NBClientEngine):
         metadata.client.nb_man = nb_man
         metadata.client.nb = nb_man.nb
         # reuse client connection to existing kernel
-        output = metadata.client.execute(cleanup_kc=False)
+        output = await metadata.client.async_execute(cleanup_kc=False)
         cls.renumber_executions(nb_man.nb)
 
         return output
@@ -143,3 +213,15 @@ class CustomEngine(NBClientEngine):
             metadata.client = None
             cls.logger.info(
                 f"Unregistered '{key}' papermill engine, last used time {now - metadata.last_used_time} sec ago")
+
+
+class CustomEngines(PapermillEngines):
+    async def async_execute_notebook_with_engine(self, engine_name, nb, kernel_name, **kwargs):
+        """Fetch a named engine and execute the nb object against it."""
+        return await self.get_engine(engine_name).async_execute_notebook(nb, kernel_name, **kwargs)
+
+
+# Instantiate a ExactproPapermillEngines instance, register Handlers and entrypoints
+exactpro_papermill_engines = CustomEngines()
+exactpro_papermill_engines.register(None, CustomEngine)
+exactpro_papermill_engines.register_entry_points()
