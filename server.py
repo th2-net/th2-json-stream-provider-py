@@ -31,7 +31,7 @@ from aiohttp_swagger import *
 from aiojobs import Job
 from aiojobs.aiohttp import setup
 
-from custom_engines import CustomEngine
+from custom_engines import CustomEngine, EngineBusyError
 from log_configuratior import configure_logging
 
 os.system('pip list')
@@ -407,6 +407,10 @@ async def launch_notebook(input_path, arguments: dict, file_name, task_metadata:
             task_metadata.status = TaskStatus.SUCCESS
             task_metadata.result = arguments.get('output_path')
             task_metadata.customization = arguments.get('customization_path')
+    except EngineBusyError as error:
+        logger.warning(error.args)
+        task_metadata.status = TaskStatus.FAILED
+        task_metadata.result = error
     except Exception as error:
         logger.error(f'failed to launch notebook {input_path}', error)
         task_metadata.status = TaskStatus.FAILED
