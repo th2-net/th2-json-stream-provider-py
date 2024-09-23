@@ -132,10 +132,14 @@ docker compose build
 * update local run with jupyter-notebook:
   * updated th2-rpt-viewer:
     * `JSON Reader` page pulls execution status each 50 ms instead of 1 sec
+    * `JSON Reader` page now uses virtuoso for rendering lists
+    * `JSON Reader` page now has search, it's values could be loaded from `json` file containing array of objects containing `pattern` and `color` fields for searching content. Execution of notebook could create such file and it will be loaded into UI if it would be created in path of `customization_path` parameter.
+    * Added ability to create multiple `JSON Reader` pages.
+    * `JSON Reader` page now has compare mode.
 
 ### 0.0.5
 
-* added `umask 0007` to `~/.bashrc` file to provide rw file access for `users` group 
+* added `umask 0007` to `~/.bashrc` file to provide rw file access for `users` group
 * added `/file` request for loading content of single jsonl file
 * removed ability to get any file from machine via `/file` REST APIs
 * added sorting on requests `/files/notebooks` and `/files/results`
