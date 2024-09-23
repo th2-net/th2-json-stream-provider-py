@@ -1,6 +1,6 @@
 services:
   json_stream_provider:
-    image: ghcr.io/th2-net/th2-json-stream-provider-py:0.0.6-notebooks-launch-time-10403209484-db4f850
+    image: ghcr.io/th2-net/th2-json-stream-provider-py:0.0.6-notebooks-launch-time-10961501708-6ec70be
     ports:
       - "8081:8080"
     volumes:
