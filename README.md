@@ -9,6 +9,7 @@ This python server is made to launch Jupyter notebooks (*.ipynb) and get results
 * `notebooks` (Default value: /home/jupyter-notebook/) - path to the directory with notebooks. `j-sp` search files with `ipynb` extension recursively in the specified folder.
 * `results` (Default value: /home/jupyter-notebook/results) - path to the directory for run results. `j-sp` resolves result file with `jsonl` extension against specified folder.
 * `logs` (Default value: /home/jupyter-notebook/logs) - path to the directory for run logs. `j-sp` puts run logs to specified folder.
+* `out-of-use-engine-time` (Default value: 3600) - out-of-use time interval in seconds. `j-sp` unregisters engine related to a notebook when user doesn't run the notebook more than this time
 
 ### mounting:
 
@@ -37,6 +38,7 @@ spec:
     notebooks: /home/jupyter-notebook/
     results: /home/jupyter-notebook/j-sp/results/
     logs: /home/jupyter-notebook/j-sp/logs/
+    out-of-use-engine-time: 3600
   mounting:
     - path: /home/jupyter-notebook/
       pvcName: jupyter-notebook
@@ -100,7 +102,7 @@ chmod -R g=u user_data/
 #### start command
 ```shell
 cd local-run/with-jupyter-notebook
-docker compose up
+docker compose up --build
 ```
 #### clean command
 ```shell
@@ -119,9 +121,25 @@ docker compose build
 
 ## Release notes:
 
+### 0.0.7
+
+* Custom engine holds separate papermill notebook client for each file.
+
+### 0.0.6
+
+* Added papermill custom engine to reuse it for notebook execution.
+  A separate engine is registered for each notebook and unregistered after 1 hour out-of-use time by default.
+* update local run with jupyter-notebook:
+  * updated th2-rpt-viewer:
+    * `JSON Reader` page pulls execution status each 50 ms instead of 1 sec
+    * `JSON Reader` page now uses virtuoso for rendering lists
+    * `JSON Reader` page now has search, it's values could be loaded from `json` file containing array of objects containing `pattern` and `color` fields for searching content. Execution of notebook could create such file and it will be loaded into UI if it would be created in path of `customization_path` parameter.
+    * Added ability to create multiple `JSON Reader` pages.
+    * `JSON Reader` page now has compare mode.
+
 ### 0.0.5
 
-* added `umask 0007` to `~/.bashrc` file to provide rw file access for `users` group 
+* added `umask 0007` to `~/.bashrc` file to provide rw file access for `users` group
 * added `/file` request for loading content of single jsonl file
 * removed ability to get any file from machine via `/file` REST APIs
 * added sorting on requests `/files/notebooks` and `/files/results`
