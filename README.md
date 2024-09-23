@@ -121,6 +121,10 @@ docker compose build
 
 ## Release notes:
 
+### 0.0.7
+
+* Custom engine holds separate papermill notebook client for each file.
+
 ### 0.0.6
 
 * Added papermill custom engine to reuse it for notebook execution.
