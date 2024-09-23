@@ -3,8 +3,8 @@ FROM python:3.9-slim
 
 # Set the working directory in the container
 WORKDIR /app
-# Copy base project files into the container at /app
-COPY LICENSE NOTICE README.md package_info.json requirements.txt /app/
+# Copy requirements.txt into the container at /app
+COPY requirements.txt /app/
 
 # groupadd --system - create a system account
 # useradd --system - create a system account
@@ -41,9 +41,10 @@ ENV PIP_CONFIG_FILE="${HOME}/.pip/pip.conf"
 RUN mkdir -p "${PYTHON_SHARED_LIB_PATH}"
 RUN echo 'umask 0007' >> "${HOME}/.bashrc"
 
-# Copy the json_stream_provider contents into the container at /app
+# Copy the json_stream_provider module into the container at /app
 COPY json_stream_provider /app/json_stream_provider
-COPY server.py /app/
+# Copy the destributive files into the container at /app
+COPY LICENSE NOTICE README.md package_info.json server.py /app/
 
 ENTRYPOINT ["python", "/app/server.py"]
 CMD ["/var/th2/config/custom.json"]
