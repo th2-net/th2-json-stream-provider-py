@@ -1,8 +1,6 @@
 services:
   json_stream_provider:
-    build:
-      context: ../../
-      dockerfile: Dockerfile
+    image: ghcr.io/th2-net/th2-json-stream-provider-py:0.0.7-notebooks-launch-time-10989929934-e84a588
     ports:
       - "8081:8080"
     volumes:
