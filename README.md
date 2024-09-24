@@ -123,7 +123,8 @@ docker compose build
 
 ### 0.0.7
 
-* Custom engine holds separate papermill notebook client for each file.
+* j-sp generates cookies with `engine_user_id` field to identify user for creating unique python engine.
+* Custom engine holds separate papermill notebook client for each `engine_user_id` and file combination.
 
 ### 0.0.6
 
