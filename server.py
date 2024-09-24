@@ -11,42 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 import asyncio
 import json
@@ -56,19 +20,26 @@ from argparse import ArgumentParser
 from asyncio import Task
 from datetime import datetime, timezone
 from enum import Enum
+from logging import INFO
 from typing import Coroutine, Any
+from uuid import uuid4
 
-from json_stream_provider import papermill_execute_ext as epm
 import papermill as pm
-from papermill.utils import chdir
 from aiohttp import web
+from aiohttp.web_middlewares import middleware
 from aiohttp.web_request import Request
+from aiohttp.web_response import Response
 from aiohttp_swagger import *
 from aiojobs import Job
 from aiojobs.aiohttp import setup
+from papermill.utils import chdir
 
+from json_stream_provider import papermill_execute_ext as epm
 from json_stream_provider.custom_engines import CustomEngine, EngineBusyError
 from json_stream_provider.log_configuratior import configure_logging
+from json_stream_provider.papermill_execute_ext import DEFAULT_ENGINE_USER_ID
+
+ENGINE_USER_ID_COOKIE_KEY = 'engine_user_id'
 
 os.system('pip list')
 
@@ -146,8 +117,45 @@ def read_config(path: str):
         logger.error(f"Read '{path}' configuration failure", e)
 
 
+def get_or_default_engine_user_id(req: Request) -> str:
+    return req.cookies.get(ENGINE_USER_ID_COOKIE_KEY, DEFAULT_ENGINE_USER_ID)
+
+
+def get_or_gen_engine_user_id(req: Request = None) -> str:
+    global logger
+
+    engine_user_id: str = DEFAULT_ENGINE_USER_ID
+    if req is not None:
+        engine_user_id = get_or_default_engine_user_id(req)
+    if engine_user_id == DEFAULT_ENGINE_USER_ID:
+        engine_user_id = str(uuid4())
+        if logger.isEnabledFor(INFO):
+            user_agent = req.headers.get('User-Agent', 'unknown')
+            user_ip = req.remote
+            logger.info(f"Generated user identifier for {user_ip}/{user_agent}")
+    return engine_user_id
+
+
+def put_engine_user_id_if_absent(res: Response, engine_user_id: str = None, req: Request = None) -> Response:
+    if res.cookies.get(ENGINE_USER_ID_COOKIE_KEY) is not None:
+        return res
+
+    if engine_user_id is None:
+        engine_user_id = get_or_gen_engine_user_id(req)
+    res.set_cookie(ENGINE_USER_ID_COOKIE_KEY, engine_user_id)
+    return res
+
+
+@middleware
+async def add_engine_user_id_middleware(req, handler):
+    res = await handler(req)
+    if isinstance(req, Request) and isinstance(res, Response) and res.status == 200:
+        res = put_engine_user_id_if_absent(res=res, req=req)
+    return res
+
+
 # noinspection PyUnusedLocal
-async def req_status(req: Request):
+async def req_status(req: Request) -> Response:
     """
     ---
     description: This end-point allow to test that service is up.
@@ -192,7 +200,7 @@ def replace_server_to_local(path: str):
     raise Exception("Path didn't start with notebooks or results folder")
 
 
-async def req_notebooks(req: Request):
+async def req_notebooks(req: Request) -> Response:
     """
     ---
     description: This end-point allows to get notebooks that could be requested.
@@ -252,7 +260,7 @@ async def req_notebooks(req: Request):
     })
 
 
-async def req_jsons(req: Request):
+async def req_jsons(req: Request) -> Response:
     """
     ---
     description: This end-point allows to get JSONLs that could be requested.
@@ -321,7 +329,7 @@ async def req_jsons(req: Request):
     })
 
 
-async def req_files(req: Request):
+async def req_files(req: Request) -> Response:
     """
     ---
     description: This end-point allows to get files and directories.
@@ -390,7 +398,7 @@ async def req_files(req: Request):
     })
 
 
-async def req_parameters(req: Request):
+async def req_parameters(req: Request) -> Response:
     """
     ---
     description: This end-point allows to get parameters for notebook in requested path.
@@ -420,7 +428,7 @@ async def req_parameters(req: Request):
     return web.json_response(params)
 
 
-async def launch_notebook(input_path, arguments: dict, file_name, task_metadata: TaskMetadata):
+async def launch_notebook(engine_user_id: str, input_path, arguments: dict, file_name, task_metadata: TaskMetadata):
     global logger
     global tasks
     logger.info(f'launching notebook {input_path} with {arguments}')
@@ -435,6 +443,7 @@ async def launch_notebook(input_path, arguments: dict, file_name, task_metadata:
         with chdir(input_path[:input_path.rfind('/')]):
             input_path = input_path[input_path.rfind('/') + 1:]
             await epm.async_execute_notebook(
+                engine_user_id=engine_user_id,
                 input_path=input_path,
                 output_path=log_out,
                 parameters=arguments,
@@ -473,7 +482,7 @@ def convert_parameter(parameter):
         return parameter_value
 
 
-async def req_launch(req: Request):
+async def req_launch(req: Request) -> Response:
     """
     ---
     description: This end-point allows to start notebook. Query requires path to notebook.
@@ -492,7 +501,6 @@ async def req_launch(req: Request):
         "500":
             description: failed operation. directory for output doesn't exist.
     """
-    from uuid import uuid4
     global tasks
     global logger
     path_arg = req.rel_url.query.get('path', '')
@@ -514,6 +522,7 @@ async def req_launch(req: Request):
     output_path = results_dir + '/%s.jsonl' % str(file_name)
     customization_path = results_dir + '/%s.json' % str(file_name)
     req_json = await req.json()
+    user_id = get_or_default_engine_user_id(req)
     parameters = {}
     for key, parameter in req_json.items():
         try:
@@ -525,12 +534,13 @@ async def req_launch(req: Request):
     task_id = str(uuid4())
     task_metadata = TaskMetadata(task_id=task_id)
     tasks[task_id] = task_metadata
-    task: Task[None] = asyncio.create_task(launch_notebook(path_converted, parameters, file_name, task_metadata))
+    task: Task[None] = asyncio.create_task(
+        launch_notebook(user_id, path_converted, parameters, file_name, task_metadata))
     task_metadata.task = task
     return web.json_response({'task_id': task_id})
 
 
-async def req_file(req: Request):
+async def req_file(req: Request) -> Response:
     """
     ---
     description: This end-point allows to get file from requested path. Query requires path to file.
@@ -562,7 +572,7 @@ async def req_file(req: Request):
     return web.json_response({'result': content})
 
 
-async def req_result(req: Request):
+async def req_result(req: Request) -> Response:
     """
     ---
     description: This end-point allows to get result from requested task.
@@ -615,7 +625,7 @@ async def req_result(req: Request):
         return web.HTTPNotFound()
 
 
-async def req_stop(req: Request):
+async def req_stop(req: Request) -> Response:
     """
     ---
     description: This end-point allows to stop task. Query requires task id which will be stopped.
@@ -650,7 +660,7 @@ if __name__ == '__main__':
     if cfg_path:
         read_config(cfg_path)
 
-    app = web.Application()
+    app = web.Application(middlewares=[add_engine_user_id_middleware])
 
     setup(app)
     app.router.add_route('GET', "/status", req_status)

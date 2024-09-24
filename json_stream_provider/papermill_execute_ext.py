@@ -11,18 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 from pathlib import Path
 
@@ -34,7 +22,7 @@ from papermill.iorw import get_pretty_path, load_notebook_node, local_file_io_cw
 from papermill.parameterize import add_builtin_parameters, parameterize_notebook, parameterize_path
 from papermill.utils import chdir
 
-from json_stream_provider.custom_engines import exactpro_papermill_engines
+from json_stream_provider.custom_engines import exactpro_papermill_engines, DEFAULT_ENGINE_USER_ID
 
 
 # The code of this method is derived from https://github.com/nteract/papermill/blob/2.6.0 under the BSD License.
@@ -74,6 +62,7 @@ from json_stream_provider.custom_engines import exactpro_papermill_engines
 async def async_execute_notebook(
     input_path,
     output_path,
+    engine_user_id=DEFAULT_ENGINE_USER_ID,
     parameters=None,
     engine_name=None,
     request_save_on_cell_execute=True,
@@ -97,6 +86,8 @@ async def async_execute_notebook(
         Path to input notebook or NotebookNode object of notebook
     output_path : str or Path or None
         Path to save executed notebook. If None, no file will be saved
+    engine_user_id : str
+        User id to create papermill engine client
     parameters : dict, optional
         Arbitrary keyword arguments to pass to the notebook parameters
     engine_name : str, optional
@@ -176,6 +167,7 @@ async def async_execute_notebook(
                 nb = await exactpro_papermill_engines.async_execute_notebook_with_engine(
                     engine_name,
                     nb,
+                    engine_user_id=engine_user_id,
                     input_path=input_path,
                     output_path=output_path if request_save_on_cell_execute else None,
                     kernel_name=kernel_name,
