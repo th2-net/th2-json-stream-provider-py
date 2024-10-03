@@ -20,26 +20,28 @@ from papermill.clientwrap import PapermillNotebookClient
 from papermill.engines import NBClientEngine, NotebookExecutionManager, PapermillEngines
 from papermill.utils import remove_args, merge_kwargs, logger
 
+DEFAULT_ENGINE_USER_ID = 'default_engine_user_id'
+
 
 class EngineKey:
-    def __init__(self, client_id, notebook_file):
-        self.client_id = client_id
+    def __init__(self, user_id, notebook_file):
+        self.user_id = user_id
         self.notebook_file = notebook_file
 
     def __hash__(self):
         # Combine attributes for a unique hash
-        return hash((self.client_id, self.notebook_file))
+        return hash((self.user_id, self.notebook_file))
 
     def __eq__(self, other):
         if isinstance(other, EngineKey):
-            return self.client_id == other.client_id and self.notebook_file == other.notebook_file
+            return self.user_id == other.user_id and self.notebook_file == other.notebook_file
         return False
 
     def __iter__(self):
-        return iter((self.client_id, self.notebook_file))
+        return iter((self.user_id, self.notebook_file))
 
     def __str__(self):
-        return f"{self.client_id}:{self.notebook_file}"
+        return f"{self.user_id}:{self.notebook_file}"
 
 
 class EngineHolder:
@@ -135,6 +137,7 @@ class CustomEngine(NBClientEngine):
             cls,
             nb,
             kernel_name,
+            engine_user_id=DEFAULT_ENGINE_USER_ID,
             output_path=None,
             progress_bar=True,
             log_output=False,
@@ -159,7 +162,8 @@ class CustomEngine(NBClientEngine):
 
         nb_man.notebook_start()
         try:
-            await cls.async_execute_managed_notebook(nb_man, kernel_name, log_output=log_output, **kwargs)
+            await cls.async_execute_managed_notebook(nb_man, kernel_name, log_output=log_output,
+                                                     engine_user_id=engine_user_id, **kwargs)
         finally:
             nb_man.cleanup_pbar()
             nb_man.notebook_complete()
@@ -173,6 +177,7 @@ class CustomEngine(NBClientEngine):
             cls,
             nb_man,
             kernel_name,
+            engine_user_id=DEFAULT_ENGINE_USER_ID,
             log_output=False,
             stdout_file=None,
             stderr_file=None,
@@ -190,7 +195,10 @@ class CustomEngine(NBClientEngine):
                                configured logger.
             start_timeout (int): Duration to wait for kernel start-up.
             execution_timeout (int): Duration to wait before failing execution (default: never).
+            engine_user_id (str): User id to create papermill engine client
         """
+
+        key = EngineKey(engine_user_id, nb_man.nb['metadata']['papermill']['input_path'])
 
         def create_client():  # TODO: should be static
             # Exclude parameters that named differently downstream
@@ -210,8 +218,6 @@ class CustomEngine(NBClientEngine):
             cls.logger.info(f"Created papermill notebook client for {key}")
             return PapermillNotebookClient(nb_man, **final_kwargs)
 
-        # TODO: pass client_id
-        key = EngineKey("", nb_man.nb['metadata']['papermill']['input_path'])
         engine_holder: EngineHolder = cls.get_or_create_engine_metadata(key, create_client)
         return await engine_holder.async_execute(nb_man)
 
@@ -248,9 +254,10 @@ class CustomEngine(NBClientEngine):
 
 
 class CustomEngines(PapermillEngines):
-    async def async_execute_notebook_with_engine(self, engine_name, nb, kernel_name, **kwargs):
+    async def async_execute_notebook_with_engine(self, engine_name, nb, kernel_name,
+                                                 engine_user_id=DEFAULT_ENGINE_USER_ID, **kwargs):
         """Fetch a named engine and execute the nb object against it."""
-        return await self.get_engine(engine_name).async_execute_notebook(nb, kernel_name, **kwargs)
+        return await self.get_engine(engine_name).async_execute_notebook(nb, kernel_name, engine_user_id, **kwargs)
 
 
 # Instantiate a ExactproPapermillEngines instance, register Handlers and entrypoints
