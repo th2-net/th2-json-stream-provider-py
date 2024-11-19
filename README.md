@@ -125,6 +125,12 @@ docker compose build
 
 * j-sp generates cookies with `engine_user_id` field to identify user for creating unique python engine.
 * Custom engine holds separate papermill notebook client for each `engine_user_id` and file combination.
+* update local run with jupyter-notebook:
+  * updated th2-rpt-viewer:
+    * added pycode parameter type
+    * added ability to save/load presets for notebooks
+    * compare mode was changed to have ability to launch notebooks
+    * added ability to move to nearest chunk in compare mode
 
 ### 0.0.6
 
