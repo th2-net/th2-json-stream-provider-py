@@ -28,7 +28,7 @@ services:
       - th2_network
 
   th2_rpt_viewer:
-    image: ghcr.io/th2-net/th2-rpt-viewer:5.2.9-notebooks-launch-time-10918718527
+    image: ghcr.io/th2-net/th2-rpt-viewer:5.2.11-notebooks-launch-time-11887250641
     ports:
       - "8083:8080"
     networks:
