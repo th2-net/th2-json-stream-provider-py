@@ -131,6 +131,7 @@ docker compose build
     * added ability to save/load presets for notebooks
     * compare mode was changed to have ability to launch notebooks
     * added ability to move to nearest chunk in compare mode
+    * added ability to off parameter in notebook
 
 ### 0.0.6
 
