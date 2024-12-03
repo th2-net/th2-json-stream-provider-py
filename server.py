@@ -36,6 +36,7 @@ from papermill.utils import chdir
 
 from json_stream_provider import papermill_execute_ext as epm
 from json_stream_provider.custom_engines import CustomEngine, EngineBusyError
+from json_stream_provider.custom_python_translator import CustomPythonTranslator
 from json_stream_provider.log_configuratior import configure_logging
 from json_stream_provider.papermill_execute_ext import DEFAULT_ENGINE_USER_ID
 
@@ -52,6 +53,7 @@ tasks: dict = {}
 
 configure_logging()
 CustomEngine.create_logger()
+CustomPythonTranslator.create_logger()
 logger: logging.Logger = logging.getLogger('j-sp')
 
 
