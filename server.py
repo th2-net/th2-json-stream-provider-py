@@ -99,17 +99,17 @@ def read_config(path: str):
         file = open(path, "r")
         cfg = json.load(file)
 
-        notebooks_dir = cfg.get('notebooks', notebooks_dir)
+        notebooks_dir = os.path.abspath(cfg.get('notebooks', notebooks_dir))
         logger.info('notebooks_dir=%s', notebooks_dir)
         if notebooks_dir:
             create_dir(notebooks_dir)
 
-        results_dir = cfg.get('results', results_dir)
+        results_dir = os.path.abspath(cfg.get('results', results_dir))
         logger.info('results_dir=%s', results_dir)
         if results_dir:
             create_dir(results_dir)
 
-        log_dir = cfg.get('logs', log_dir)
+        log_dir = os.path.abspath(cfg.get('logs', log_dir))
         logger.info('log_dir=%s', log_dir)
         if log_dir:
             create_dir(log_dir)
@@ -185,22 +185,12 @@ def replace_slashes(path: str):
     return path.replace('\\', '/')
 
 
-def replace_local_to_server(path: str):
-    if path.startswith(notebooks_dir):
-        return replace_slashes(path).replace(notebooks_dir, './notebooks/', 1)
-    elif path.startswith(results_dir):
-        return replace_slashes(path).replace(results_dir, './results/', 1)
-    else:
-        return replace_slashes(path)
-
-
-def replace_server_to_local(path: str):
-    if path.startswith('./notebooks'):
-        return replace_slashes(path).replace('./notebooks/', notebooks_dir, 1)
-    elif path.startswith('./results'):
-        return replace_slashes(path).replace('./results/', results_dir, 1)
-    raise Exception("Path didn't start with notebooks or results folder")
-
+def verify_path(path: str, trusted: set[str]) -> str:
+    absolute_path = os.path.abspath(path)
+    for trusted_dir in trusted:
+        if trusted_dir in absolute_path:
+            return absolute_path
+    raise ValueError(f"Verified '{absolute_path}'({path}) path isn't a part of {trusted} trusted paths")
 
 async def req_notebooks(req: Request) -> Response:
     """
@@ -224,8 +214,8 @@ async def req_notebooks(req: Request) -> Response:
     if path_arg == '':
         dirs = []
         if os.path.isdir(notebooks_dir):
-            dirs = list(map(replace_local_to_server, get_dirs(notebooks_dir)))
-        files = list(map(replace_local_to_server, get_files(notebooks_dir, '.ipynb')))
+            dirs = list(get_dirs(notebooks_dir))
+        files = list(get_files(notebooks_dir, '.ipynb'))
 
         dirs.sort()
         files.sort()
@@ -236,15 +226,15 @@ async def req_notebooks(req: Request) -> Response:
         })
 
     try:
-        path_converted = replace_server_to_local(path_arg)
+        absolute_path = verify_path(path_arg, {notebooks_dir})
     except Exception as error:
-        logger.warning("Requested path didn't start with ./notebooks", error)
-        return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
+        logger.warning(f"Requested {path_arg} path didn't start with {notebooks_dir}", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {notebooks_dir}")
 
     if path_arg:
-        if os.path.isdir(path_converted):
-            dirs = list(map(replace_local_to_server, get_dirs(path_converted)))
-            files = list(map(replace_local_to_server, get_files(path_converted, '.ipynb')))
+        if os.path.isdir(absolute_path):
+            dirs = list(get_dirs(absolute_path))
+            files = list(get_files(absolute_path, '.ipynb'))
 
             dirs.sort()
             files.sort()
@@ -286,13 +276,13 @@ async def req_jsons(req: Request) -> Response:
         dirs_res = []
         dirs_note = []
         if os.path.isdir(results_dir):
-            dirs_res = list(map(replace_local_to_server, get_dirs(results_dir)))
+            dirs_res = list(get_dirs(results_dir))
 
         if os.path.isdir(notebooks_dir):
-            dirs_note = list(map(replace_local_to_server, get_dirs(notebooks_dir)))
+            dirs_note = list(get_dirs(notebooks_dir))
 
-        files_res = list(map(replace_local_to_server, get_files(results_dir, '.jsonl')))
-        files_note = list(map(replace_local_to_server, get_files(notebooks_dir, '.jsonl')))
+        files_res = list(get_files(results_dir, '.jsonl'))
+        files_note = list(get_files(notebooks_dir, '.jsonl'))
 
         dirs = list({*dirs_note, *dirs_res})
         files = list({*files_note, *files_res})
@@ -306,14 +296,15 @@ async def req_jsons(req: Request) -> Response:
         })
 
     try:
-        path_converted = replace_server_to_local(path_arg)
+        absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
     except Exception as error:
-        logger.warning("Requested path didn't start with ./results or ./notebooks", error)
-        return web.HTTPNotFound(reason="Requested path didn't start with ./results or ./notebooks")
+        logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}")
+
     if path_arg:
-        if os.path.isdir(path_converted):
-            dirs = list(map(replace_local_to_server, get_dirs(path_converted)))
-            files = list(map(replace_local_to_server, get_files(path_converted, '.jsonl')))
+        if os.path.isdir(absolute_path):
+            dirs = list(get_dirs(absolute_path))
+            files = list(get_files(absolute_path, '.jsonl'))
 
             dirs.sort()
             files.sort()
@@ -355,13 +346,13 @@ async def req_files(req: Request) -> Response:
         dirs_res = []
         dirs_note = []
         if os.path.isdir(results_dir):
-            dirs_res = list(map(replace_local_to_server, get_dirs(results_dir)))
+            dirs_res = list(get_dirs(results_dir))
 
         if os.path.isdir(notebooks_dir):
-            dirs_note = list(map(replace_local_to_server, get_dirs(notebooks_dir)))
+            dirs_note = list(get_dirs(notebooks_dir))
 
-        files_res = list(map(replace_local_to_server, get_files(results_dir, '')))
-        files_note = list(map(replace_local_to_server, get_files(notebooks_dir, '')))
+        files_res = list(get_files(results_dir, ''))
+        files_note = list(get_files(notebooks_dir, ''))
 
         dirs = list({*dirs_note, *dirs_res})
         files = list({*files_note, *files_res})
@@ -375,14 +366,15 @@ async def req_files(req: Request) -> Response:
         })
 
     try:
-        path_converted = replace_server_to_local(path_arg)
+        absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
     except Exception as error:
-        logger.warning("Requested path didn't start with ./results or ./notebooks", error)
-        return web.HTTPNotFound(reason="Requested path didn't start with ./results or ./notebooks")
+        logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}")
+
     if path_arg:
-        if os.path.isdir(path_converted):
-            dirs = list(map(replace_local_to_server, get_dirs(path_converted)))
-            files = list(map(replace_local_to_server, get_files(path_converted, '')))
+        if os.path.isdir(absolute_path):
+            dirs = list(get_dirs(absolute_path))
+            files = list(get_files(absolute_path, ''))
 
             dirs.sort()
             files.sort()
@@ -417,16 +409,16 @@ async def req_parameters(req: Request) -> Response:
               or requested path didn't start with ./notebooks.
     """
     global logger
-    path = req.rel_url.query.get('path', '')
-    logger.info('/files?path={path}'.format(path=str(path)))
+    path_arg = req.rel_url.query.get('path', '')
+    logger.info('/files?path={path}'.format(path=str(path_arg)))
     try:
-        path_converted = replace_server_to_local(path)
+        absolute_path = verify_path(path_arg, {notebooks_dir})
     except Exception as error:
-        logger.warning("Requested path didn't start with ./notebooks", error)
-        return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
-    if not path or not os.path.isfile(path_converted):
+        logger.warning(f"Requested {path_arg} path didn't start with {notebooks_dir}", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {notebooks_dir}")
+    if not path_arg or not os.path.isfile(absolute_path):
         return web.HTTPNotFound()
-    params = pm.inspect_notebook(path_converted)
+    params = pm.inspect_notebook(absolute_path)
     return web.json_response(params)
 
 
@@ -467,19 +459,17 @@ async def launch_notebook(engine_user_id: str, input_path, arguments: dict, file
         logger.info(f'ended launch notebook {input_path} with {arguments} spent_time {spent_time} sec')
 
 
-def convert_parameter(parameter):
+def verify_parameter(parameter):
     parameter_type = parameter.get('type')
     parameter_value = parameter.get('value')
     if parameter_type == 'file path':
         try:
-            parameter_path = replace_server_to_local(parameter_value)
+            return verify_path(parameter_value, {notebooks_dir, results_dir})
         except Exception as error:
             msg = (f"Parameter {parameter.get('name')} of type={parameter_type} with value={parameter_value} "
-                   "didn't start with ./notebooks or ./results")
+                   f"didn't start with {notebooks_dir} or {results_dir}")
             logger.error(msg, error)
             raise Exception(msg, error)
-
-        return parameter_path
     else:
         return parameter_value
 
@@ -510,15 +500,15 @@ async def req_launch(req: Request) -> Response:
     if not req.can_read_body:
         return web.HTTPBadRequest(reason='Body with parameters not present')
     try:
-        path_converted = replace_server_to_local(path_arg)
+        absolute_path = verify_path(path_arg, {notebooks_dir})
     except Exception as error:
-        logger.warning("Requested path didn't start with ./notebooks", error)
-        return web.HTTPNotFound(reason="Requested path didn't start with ./notebooks")
-    if not path_arg or not os.path.isfile(path_converted):
+        logger.warning(f"Requested {path_arg} path didn't start with {notebooks_dir}", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {notebooks_dir}")
+    if not path_arg or not os.path.isfile(absolute_path):
         return web.HTTPNotFound()
     if not os.path.exists(results_dir):
         return web.HTTPInternalServerError(reason='No output directory')
-    notebook_name = path_converted.split('/')[-1].split('.')[0]
+    notebook_name = absolute_path.split('/')[-1].split('.')[0]
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S-%f")
     file_name = notebook_name + '_' + timestamp
     output_path = results_dir + '/%s.jsonl' % str(file_name)
@@ -528,7 +518,7 @@ async def req_launch(req: Request) -> Response:
     parameters = {}
     for key, parameter in req_json.items():
         try:
-            parameters[key] = convert_parameter(parameter)
+            parameters[key] = verify_parameter(parameter)
         except Exception as error:
             return web.HTTPInternalServerError(reason=str(error))
     parameters['output_path'] = output_path
@@ -537,7 +527,7 @@ async def req_launch(req: Request) -> Response:
     task_metadata = TaskMetadata(task_id=task_id)
     tasks[task_id] = task_metadata
     task: Task[None] = asyncio.create_task(
-        launch_notebook(user_id, path_converted, parameters, file_name, task_metadata))
+        launch_notebook(user_id, absolute_path, parameters, file_name, task_metadata))
     task_metadata.task = task
     return web.json_response({'task_id': task_id})
 
@@ -559,16 +549,16 @@ async def req_file(req: Request) -> Response:
     """
     global tasks
     global logger
-    path = req.rel_url.query.get('path', '')
-    logger.info('/file?path={path}'.format(path=str(path)))
+    path_arg = req.rel_url.query.get('path', '')
+    logger.info('/file?path={path}'.format(path=str(path_arg)))
     try:
-        path_converted = replace_server_to_local(path)
+        absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
     except Exception as error:
-        logger.warning("Requested path didn't start with ./results or ./notebooks", error)
-        return web.HTTPNotFound(reason="Requested path didn't start with ./results or ./notebooks")
-    if not path or not os.path.isfile(path_converted):
+        logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}")
+    if not path_arg or not os.path.isfile(absolute_path):
         return web.HTTPNotFound()
-    file = open(path_converted, "r")
+    file = open(absolute_path, "r")
     content = file.read()
     file.close()
     return web.json_response({'result': content})
@@ -618,8 +608,8 @@ async def req_result(req: Request) -> Response:
         file = open(path_param, "r")
         content = file.read()
         file.close()
-        return web.json_response({'status': status.value, 'result': content, 'customization': customization,
-                                  'path': replace_local_to_server(path_param)})
+        return web.json_response(
+            {'status': status.value, 'result': content, 'customization': customization, 'path': path_param})
     elif status == TaskStatus.FAILED:
         error: Exception = task.result
         return web.json_response({'status': status.value, 'result': str(error)})
