@@ -62,13 +62,9 @@ spec:
         port: 8080
 ```
 
-## Requirements for Jupyter's notebooks
+## Jupyter's notebooks format
 
-* Cell tagged `parameters` (required)
-  * this cell should be listed parameters only.
-  * parameters could have typing and value, but value must be constant and have primitive type like boolean, number, string.
-  * required parameters:
-    * `output_path` - path to [JSONL](https://jsonlines.org/) file. Server considers a content of this file as run results. 
+* Cell tagged `parameters` (required). You can read detail about this cell below.
 * Cell with dependencies (optional) - server doesn't include third-party packages by default. 
 You can install / uninstall packages required for your code in one of cells. All installed packages are shared between runs any notebook.
 Installation example: 
@@ -76,6 +72,119 @@ Installation example:
   import sys
   !{sys.executable} -m pip install <package_name>==<package_version>
   ```
+
+### Jupyter's notebooks inputs
+
+Notebook must have a first cell with the `parameters` tag. This cell is used to configure parametrized run.
+  * this cell should be listed parameters only.
+  * parameters could have typing and value, but value must be constant and have primitive type like boolean, number, string.
+
+#### Required parameters:
+* `output_path` - path to [JSONL](https://jsonlines.org/) file. Server considers a content of this file as run results.
+  `js-p` generates and passes a file path in the folder configured by `results` setting for this parameter   
+
+#### Optional parameters:
+* `customization_path` - path to [JSON](https://www.json.org/) file. Server considers a content of this file as run customization.
+  `js-p` generates and passes a file path in the folder configured by `results` setting for this parameter
+
+#### Special parameters suffixes 
+
+Parameter names can have special suffixes to help a viewer apples different controls for them
+* `_file` - string parameter is containing path to a file on the server node. `js-p` provides paths to a files located in the folders or sub-folders of configured dirs by `notebooks` and `results` settings
+* `_timestamp` - string parameter is containing datetime in the ISO format like `2024-07-01T05:06:59.664Z`
+* `_pycode` - string parameter is containing a code. A viewer can apply highlighting for this parameter
+
+### Jupyter's notebooks outputs examples
+
+#### Content example of file configured by `output_path` parameter
+
+Each JSON in JSONL contain can contain special fields. A viewer can have special logic for handling these fields.
+* `#display-timestamp` - contain [Unix time](https://en.wikipedia.org/wiki/Unix_time) in milliseconds. on
+  example: // FIXME: check in UI 
+  ```json
+  {
+    "#display-timestamp": 1737048910123,
+    "sub-node": {
+      "#display-timestamp": 1737048910456
+    }
+  }
+  ```
+* `#display-name` - short name of JSON Node. A viewer can show this value instead or together with full node content.
+  example: 
+  ```json
+  {
+    "#display-name": "Root node",
+    "sub-node": {
+      "#display-name": "Sub node"
+    }
+  }
+  ```
+* `#display-table` - table view of JSON Node. This value can cover the whole content of the Node or cover only part of data. 
+  example:
+```json
+{
+  "#display-table": [
+    ["int", "float"],
+    [19700, 19.700000000000003],
+    [39400, 39.400000000000006]
+  ],
+  "array": [
+    {
+      "name": "str_100_test",
+      "int": 19700,
+      "float": 19.700000000000003
+    },
+    {
+      "name": "str_200_test",
+      "int": 39400,
+      "float": 39.400000000000006
+    }
+  ],
+  "sub-node": {
+    "#display-table": [
+      ["int", "float"],
+      [5300, 5.300000000000001],
+      [10600, 10.600000000000001]
+    ],
+    "array": [
+      {
+        "name": "str_100_test",
+        "int": 5300,
+        "float": 5.300000000000001
+      },
+      {
+        "name": "str_200_test",
+        "int": 10600,
+        "float": 10.600000000000001
+      }
+    ]
+  }
+}
+```
+
+```json lines
+{"#display-timestamp": 1737365836543469879, "#display-name": "18 - 2025-01-20 13:37:16.543470", "#display-table": [["int", "float"], [19700, 19.700000000000003], [39400, 39.400000000000006]], "array": [{"#display-name": "str_100_test:2024-07-01T05:06:59.664Z:False", "name": "str_100_test", "int": 19700, "float": 19.700000000000003, "flag": false, "custom_time": "2024-07-01T05:06:59.664Z"}, {"#display-name": "str_200_test:2024-07-01T05:06:59.665Z:True", "name": "str_200_test", "int": 39400, "float": 39.400000000000006, "flag": true, "custom_time": "2024-07-01T05:06:59.665Z"}]}
+{"#display-timestamp": 1737365836543501603, "#display-name": "19 - 2025-01-20 13:37:16.543502", "#display-table": [["int", "float"], [5300, 5.300000000000001], [10600, 10.600000000000001]], "array": [{"#display-name": "str_100_test:2024-07-01T05:06:59.664Z:False", "name": "str_100_test", "int": 5300, "float": 5.300000000000001, "flag": false, "custom_time": "2024-07-01T05:06:59.664Z"}, {"#display-name": "str_200_test:2024-07-01T05:06:59.665Z:True", "name": "str_200_test", "int": 10600, "float": 10.600000000000001, "flag": true, "custom_time": "2024-07-01T05:06:59.665Z"}]}
+```
+
+#### Content example of file configured by `customization_path` parameter
+
+This JSON should have list of pattern. Each pattern should have the fields:
+* `pattern` - text which should be highlighted 
+* `color` - color for highlighting
+
+```json
+[
+  {
+    "pattern": "str_100_test",
+    "color": "#3CD91F"
+  },
+  {
+    "pattern": "str_200_test",
+    "color": "#9356D5"
+  }
+]
+```
 
 ## local run
 
