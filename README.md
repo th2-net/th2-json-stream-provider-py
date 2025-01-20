@@ -121,6 +121,11 @@ docker compose build
 
 ## Release notes:
 
+### 0.1.0
+
+* Updated python: `3.11.6`
+* j-sp returns full paths via REST API
+
 ### 0.0.7
 
 * j-sp generates cookies with `engine_user_id` field to identify user for creating unique python engine.
