@@ -100,13 +100,11 @@ Parameter names can have special suffixes to help a viewer apples different cont
 
 Each JSON in JSONL contain can contain special fields. A viewer can have special logic for handling these fields.
 * `#display-timestamp` - contain [Unix time](https://en.wikipedia.org/wiki/Unix_time) in milliseconds. on
-  example: // FIXME: check in UI 
+  example:
   ```json
   {
     "#display-timestamp": 1737048910123,
-    "sub-node": {
-      "#display-timestamp": 1737048910456
-    }
+    "filed": "value"
   }
   ```
 * `#display-name` - short name of JSON Node. A viewer can show this value instead or together with full node content.
@@ -114,8 +112,10 @@ Each JSON in JSONL contain can contain special fields. A viewer can have special
   ```json
   {
     "#display-name": "Root node",
+    "filed": "value",
     "sub-node": {
-      "#display-name": "Sub node"
+      "#display-name": "Sub node",
+      "sub-filed": "sub-value"
     }
   }
   ```
@@ -128,6 +128,7 @@ Each JSON in JSONL contain can contain special fields. A viewer can have special
     [19700, 19.700000000000003],
     [39400, 39.400000000000006]
   ],
+  "results": 2,
   "array": [
     {
       "name": "str_100_test",
@@ -139,32 +140,13 @@ Each JSON in JSONL contain can contain special fields. A viewer can have special
       "int": 39400,
       "float": 39.400000000000006
     }
-  ],
-  "sub-node": {
-    "#display-table": [
-      ["int", "float"],
-      [5300, 5.300000000000001],
-      [10600, 10.600000000000001]
-    ],
-    "array": [
-      {
-        "name": "str_100_test",
-        "int": 5300,
-        "float": 5.300000000000001
-      },
-      {
-        "name": "str_200_test",
-        "int": 10600,
-        "float": 10.600000000000001
-      }
-    ]
-  }
+  ]
 }
 ```
 
 ```json lines
-{"#display-timestamp": 1737365836543469879, "#display-name": "18 - 2025-01-20 13:37:16.543470", "#display-table": [["int", "float"], [19700, 19.700000000000003], [39400, 39.400000000000006]], "array": [{"#display-name": "str_100_test:2024-07-01T05:06:59.664Z:False", "name": "str_100_test", "int": 19700, "float": 19.700000000000003, "flag": false, "custom_time": "2024-07-01T05:06:59.664Z"}, {"#display-name": "str_200_test:2024-07-01T05:06:59.665Z:True", "name": "str_200_test", "int": 39400, "float": 39.400000000000006, "flag": true, "custom_time": "2024-07-01T05:06:59.665Z"}]}
-{"#display-timestamp": 1737365836543501603, "#display-name": "19 - 2025-01-20 13:37:16.543502", "#display-table": [["int", "float"], [5300, 5.300000000000001], [10600, 10.600000000000001]], "array": [{"#display-name": "str_100_test:2024-07-01T05:06:59.664Z:False", "name": "str_100_test", "int": 5300, "float": 5.300000000000001, "flag": false, "custom_time": "2024-07-01T05:06:59.664Z"}, {"#display-name": "str_200_test:2024-07-01T05:06:59.665Z:True", "name": "str_200_test", "int": 10600, "float": 10.600000000000001, "flag": true, "custom_time": "2024-07-01T05:06:59.665Z"}]}
+{"#display-timestamp": 1737388741801564430, "#display-name": "2 - 2025-01-20 19:59:01.801564", "#display-table": [["int", "float"], ["45200", "45.2"], ["90400", "90.4"]], "results": 2, "array": [{"#display-name": "str_100_test:2024-07-01T05:06:59.664Z:False", "name": "str_100_test", "int": 45200, "float": 45.2, "flag": false, "custom_time": "2024-07-01T05:06:59.664Z"}, {"#display-name": "str_200_test:2024-07-01T05:06:59.665Z:True", "name": "str_200_test", "int": 90400, "float": 90.4, "flag": true, "custom_time": "2024-07-01T05:06:59.665Z"}]}
+{"#display-timestamp": 1737388741801596018, "#display-name": "3 - 2025-01-20 19:59:01.801596", "#display-table": [["int", "float"], ["23800", "23.8"], ["47600", "47.6"]], "results": 2, "array": [{"#display-name": "str_100_test:2024-07-01T05:06:59.664Z:False", "name": "str_100_test", "int": 23800, "float": 23.8, "flag": false, "custom_time": "2024-07-01T05:06:59.664Z"}, {"#display-name": "str_200_test:2024-07-01T05:06:59.665Z:True", "name": "str_200_test", "int": 47600, "float": 47.6, "flag": true, "custom_time": "2024-07-01T05:06:59.665Z"}]}
 ```
 
 #### Content example of file configured by `customization_path` parameter
