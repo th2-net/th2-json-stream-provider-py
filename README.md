@@ -131,13 +131,21 @@ chmod -R g=u user_data/
   docker-compose down --volumes
   docker-compose build
   ```
+
 #### application URLs:
 * http://localhost:8080 - th2-rpt-viewer
-* http://localhost:8082 - jupyter-notebook. You can authorise via token printed into `jupyter_notebook` logs:
-  ```shell
-  cd local-run/with-jupyter-notebook
-  docker compose logs jupyter_notebook | grep 'jupyter/lab?token=' | tail -1 | cut -d '=' -f 2
-  ```
+* http://localhost:8082 - jupyter-notebook. 
+  You can authorise via token printed into `jupyter_notebook` logs:
+  * if you use docker
+    ```shell
+    cd local-run/with-jupyter-notebook
+    docker compose logs jupyter_notebook | grep '/lab?token=' | tail -1 | cut -d '=' -f 2
+    ```
+  * if you use podman
+    ```shell
+    cd local-run/with-jupyter-notebook
+    docker-compose logs jupyter_notebook | grep '/lab?token=' | tail -1 | cut -d '=' -f 2
+    ```
 
 ## Release notes:
 
@@ -145,6 +153,8 @@ chmod -R g=u user_data/
 
 * Updated python: `3.11.6`
 * j-sp returns full paths via REST API
+* changed URLs for apps when local run used
+* added commands for podman
 
 ### 0.0.7
 
