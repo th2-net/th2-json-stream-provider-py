@@ -15,6 +15,7 @@ services:
       - th2_network
 
   jupyter_notebook:
+    container_name: jupyter_notebook
     build:
       context: ./jupyter-notebook
       dockerfile: Dockerfile
@@ -35,9 +36,10 @@ services:
       - th2_network
 
   nginx_reverse_proxy:
+    container_name: nginx_reverse_proxy
     image: nginx
     ports:
-      - "80:80"
+      - "8080:8080"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
