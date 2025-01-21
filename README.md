@@ -99,12 +99,12 @@ Parameter names can have special suffixes to help a viewer apples different cont
 #### Content example of file configured by `output_path` parameter
 
 Each JSON in JSONL contain can contain special fields. A viewer can have special logic for handling these fields.
-* `#display-timestamp` - contain [Unix time](https://en.wikipedia.org/wiki/Unix_time) in milliseconds. on
+* `#display-timestamp` - contain [Unix time](https://en.wikipedia.org/wiki/Unix_time) in nanoseconds. on
   example:
   ```json
   {
-    "#display-timestamp": 1737048910123,
-    "filed": "value"
+    "#display-timestamp": 1737048910123000000,
+    "field": "value"
   }
   ```
 * `#display-name` - short name of JSON Node. A viewer can show this value instead or together with full node content.
@@ -112,10 +112,10 @@ Each JSON in JSONL contain can contain special fields. A viewer can have special
   ```json
   {
     "#display-name": "Root node",
-    "filed": "value",
+    "field": "value",
     "sub-node": {
       "#display-name": "Sub node",
-      "sub-filed": "sub-value"
+      "sub-field": "sub-value"
     }
   }
   ```
