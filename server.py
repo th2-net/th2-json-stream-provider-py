@@ -1,4 +1,4 @@
-#  Copyright 2024 Exactpro (Exactpro Systems Limited)
+#  Copyright 2024-2025 Exactpro (Exactpro Systems Limited)
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 import asyncio
-import json
+import orjson
 import logging.config
 import os
 from argparse import ArgumentParser
@@ -41,6 +41,7 @@ from json_stream_provider.log_configuratior import configure_logging
 from json_stream_provider.papermill_execute_ext import DEFAULT_ENGINE_USER_ID
 
 ENGINE_USER_ID_COOKIE_KEY = 'engine_user_id'
+DISPLAY_TIMESTAMP_FIELD = '#display-timestamp'
 
 os.system('pip list')
 
@@ -85,6 +86,15 @@ class TaskMetadata:
             self.job.close()
 
 
+def _safe_str_to_int(s):
+    global logger
+    try:
+        return int(s)
+    except ValueError:
+        logger.warning(f"Error: '{s}' is not a valid integer.")
+        return 0
+
+
 def create_dir(path: str):
     if not os.path.exists(path):
         os.makedirs(path)
@@ -97,7 +107,7 @@ def read_config(path: str):
     global logger
     try:
         file = open(path, "r")
-        cfg = json.load(file)
+        cfg = orjson.loads(file.read())
 
         notebooks_dir = os.path.abspath(cfg.get('notebooks', notebooks_dir))
         logger.info('notebooks_dir=%s', notebooks_dir)
@@ -564,6 +574,80 @@ async def req_file(req: Request) -> Response:
     return web.json_response({'result': content})
 
 
+def _append_interval(interval: dict[str, int], path_value: str, line_num: int, line: str, alias: str):
+    interval[f"{alias}-line"] = line_num
+    try:
+        obj = orjson.loads(line)
+        timestamp = obj.get(DISPLAY_TIMESTAMP_FIELD)
+        if timestamp is not None:
+            interval[f"{alias}-display-timestamp"] = timestamp
+    except Exception as error:
+        logger.warning(f"The {line_num} line from {path_value} can't be analyzed", error)
+
+
+async def req_file_info(req: Request) -> Response:
+    """
+    ---
+    description: This end-point allows to get file info from requested path. Query requires path to file.
+    tags:
+    - File operation
+    produces:
+    - application/json
+    responses:
+        "200":
+            description: successful operation. Return file's json.
+        "404":
+            description: failed operation. requested file doesn't exist
+              or requested path didn't start with ./results or ./notebooks.
+    """
+    global tasks
+    global logger
+    path_arg = req.rel_url.query.get('path', '')
+    interval_lines_arg = req.rel_url.query.get('interval-lines', '0')
+    logger.info('/file?path={path}'.format(path=str(path_arg)))
+    try:
+        absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
+    except Exception as error:
+        logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}")
+    if not path_arg or not os.path.isfile(absolute_path):
+        return web.HTTPNotFound()
+
+    intervals: list[dict[str, int]] = []
+    line_count = 0
+    try:
+        with open(absolute_path, "r") as f:
+            interval_size = _safe_str_to_int(interval_lines_arg)
+            interval: dict[str, int] = {}
+            last_line: str
+            for line in f:
+                if interval_size > 0:
+                    last_line = line
+
+                    if interval_size == 1:
+                        _append_interval(interval, path_arg, line_count, line, 'first')
+                        _append_interval(interval, path_arg, line_count, line, 'last')
+                        intervals.append(interval)
+                        interval = {}
+                    elif line_count % interval_size == 0:
+                        _append_interval(interval, path_arg, line_count, line, 'first')
+                    elif (line_count + 1) % interval_size == 0:
+                        _append_interval(interval, path_arg, line_count, line, 'last')
+                        intervals.append(interval)
+                        interval = {}
+
+                line_count += 1
+
+            if interval:
+                _append_interval(interval, path_arg, line_count, last_line, 'last')
+                intervals.append(interval)
+    except Exception as error:
+        logger.warning(f"Lines number calculation for {path_arg} path failure", error)
+        return web.HTTPInternalServerError(reason=f"Lines number calculation for {path_arg} path failure")
+
+    return web.json_response({'lines': line_count, 'intervals': intervals})
+
+
 async def req_result(req: Request) -> Response:
     """
     ---
@@ -661,6 +745,7 @@ if __name__ == '__main__':
     app.router.add_route('GET', "/files/all", req_files)
     app.router.add_route('GET', "/files", req_parameters)
     app.router.add_route('GET', "/file", req_file)
+    app.router.add_route('GET', "/file/info", req_file_info)
     app.router.add_route('POST', "/execute", req_launch)
     app.router.add_route('GET', "/result", req_result)
     app.router.add_route('POST', "/stop", req_stop)
