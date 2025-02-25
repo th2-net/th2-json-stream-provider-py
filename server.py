@@ -639,7 +639,7 @@ async def req_file_info(req: Request) -> Response:
                 line_count += 1
 
             if interval:
-                _append_interval(interval, path_arg, line_count, last_line, 'last')
+                _append_interval(interval, path_arg, line_count - 1, last_line, 'last')
                 intervals.append(interval)
     except Exception as error:
         logger.warning(f"Lines number calculation for {path_arg} path failure", error)
