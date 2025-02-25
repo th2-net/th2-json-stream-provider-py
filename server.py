@@ -86,15 +86,6 @@ class TaskMetadata:
             self.job.close()
 
 
-def _safe_str_to_int(s):
-    global logger
-    try:
-        return int(s)
-    except ValueError:
-        logger.warning(f"Error: '{s}' is not a valid integer.")
-        return 0
-
-
 def create_dir(path: str):
     if not os.path.exists(path):
         os.makedirs(path)
@@ -574,6 +565,88 @@ async def req_file(req: Request) -> Response:
     return web.json_response({'result': content})
 
 
+async def req_file_lines(req: Request) -> Response:
+    """
+    ---
+    description: This end-point allows to get part of file.
+    args:
+    - path (required) - path to file
+    - start (option) - the number of the first requested lines otherwise min
+    - end (option) - the number of the last requested lines otherwise max
+    tags:
+    - File operation
+    produces:
+    - application/json
+    responses:
+        "200":
+            description: successful operation. Return file's json.
+        "404":
+            description: failed operation. requested file doesn't exist
+              or requested path didn't start with ./results or ./notebooks.
+        "422"
+            start isn't positive int
+              or end isn't positive int
+              or start > end
+        "500":
+            file can't be read
+    """
+    global tasks
+    global logger
+    path_arg = req.rel_url.query.get('path', '')
+    start_arg = req.rel_url.query.get('start')
+    end_arg = req.rel_url.query.get('end')
+    logger.info('/file?path={path}'.format(path=str(path_arg)))
+    try:
+        absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
+    except Exception as error:
+        logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}")
+    if not path_arg or not os.path.isfile(absolute_path):
+        return web.HTTPNotFound()
+
+    try:
+        start = None if start_arg is None else int(start_arg)
+    except ValueError as error:
+        logger.warning(f"'{start_arg}' start isn't valid int", error)
+        return web.HTTPUnprocessableEntity(reason=f"'{start_arg}' start isn't valid int")
+
+    if start is not None and start < 0:
+        logger.warning(f"'{start_arg}' start can't be negative")
+        return web.HTTPUnprocessableEntity(reason=f"'{start_arg}' start can't be negative")
+
+    try:
+        end = None if end_arg is None else int(end_arg)
+    except ValueError as error:
+        logger.warning(f"'{end_arg}' end isn't valid int", error)
+        return web.HTTPUnprocessableEntity(reason=f"'{end_arg}' start isn't valid int")
+
+    if end is not None and end < 0:
+        logger.warning(f"'{end_arg}' end can't be negative")
+        return web.HTTPUnprocessableEntity(reason=f"'{end_arg}' end can't be negative")
+
+    if start is not None and end is not None and start > end:
+        logger.warning(f"'{start}' start > '{end}' end argument")
+        return web.HTTPUnprocessableEntity(reason=f"'{start}' start > '{end}' end argument")
+
+    try:
+        content: str
+        with open(absolute_path, "r") as f:
+            if start is None and end is None:
+                content = f.read()
+            else:
+                lines: list[str] = []
+                for i, line in enumerate(f):
+                    if (start is None or start <= i) and (end is None or i <= end):
+                        lines.append(line)
+                    if end is not None and i > end:
+                        break
+                content = '\n'.join(lines)
+        return web.json_response({'result': content})
+    except Exception as error:
+        logger.warning(f"Filter {path_arg} file by [{start_arg},{end_arg}] range failure", error)
+        return web.HTTPInternalServerError(reason=f"Filter {path_arg} file by [{start_arg},{end_arg}] failure: {error}")
+
+
 def _append_interval(interval: dict[str, int], path_value: str, line_num: int, line: str, alias: str):
     interval[f"{alias}-line"] = line_num
     try:
@@ -588,22 +661,30 @@ def _append_interval(interval: dict[str, int], path_value: str, line_num: int, l
 async def req_file_info(req: Request) -> Response:
     """
     ---
-    description: This end-point allows to get file info from requested path. Query requires path to file.
+    description: This end-point allows to get file info.
+    args:
+    - path (required) - path to file
+    - interval (optional) - interval size for splitting file to blocks and extract firs / last display-timestamp for them
     tags:
     - File operation
     produces:
     - application/json
     responses:
         "200":
-            description: successful operation. Return file's json.
+            description: successful operation. Return file's info json.
         "404":
             description: failed operation. requested file doesn't exist
               or requested path didn't start with ./results or ./notebooks.
+        "422"
+            interval isn't positive int
+        "500":
+            file can't be read
+
     """
     global tasks
     global logger
     path_arg = req.rel_url.query.get('path', '')
-    interval_lines_arg = req.rel_url.query.get('interval-lines', '0')
+    interval_arg = req.rel_url.query.get('interval')
     logger.info('/file?path={path}'.format(path=str(path_arg)))
     try:
         absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
@@ -613,11 +694,20 @@ async def req_file_info(req: Request) -> Response:
     if not path_arg or not os.path.isfile(absolute_path):
         return web.HTTPNotFound()
 
-    intervals: list[dict[str, int]] = []
-    line_count = 0
     try:
+        interval_size = 0 if interval_arg is None else int(interval_arg)
+    except ValueError as error:
+        logger.warning(f"'{interval_arg}' interval isn't valid int", error)
+        return web.HTTPUnprocessableEntity(reason=f"'{interval_arg}' interval isn't valid int")
+
+    if interval_size < 0:
+        logger.warning(f"'{interval_arg}' interval can't be negative")
+        return web.HTTPUnprocessableEntity(reason=f"'{interval_arg}' interval can't be negative")
+
+    try:
+        intervals: list[dict[str, int]] = []
+        line_count = 0
         with open(absolute_path, "r") as f:
-            interval_size = _safe_str_to_int(interval_lines_arg)
             interval: dict[str, int] = {}
             last_line: str
             for line in f:
@@ -641,11 +731,11 @@ async def req_file_info(req: Request) -> Response:
             if interval:
                 _append_interval(interval, path_arg, line_count - 1, last_line, 'last')
                 intervals.append(interval)
+
+        return web.json_response({'lines': line_count, 'intervals': intervals})
     except Exception as error:
         logger.warning(f"Lines number calculation for {path_arg} path failure", error)
         return web.HTTPInternalServerError(reason=f"Lines number calculation for {path_arg} path failure")
-
-    return web.json_response({'lines': line_count, 'intervals': intervals})
 
 
 async def req_result(req: Request) -> Response:
@@ -745,6 +835,7 @@ if __name__ == '__main__':
     app.router.add_route('GET', "/files/all", req_files)
     app.router.add_route('GET', "/files", req_parameters)
     app.router.add_route('GET', "/file", req_file)
+    app.router.add_route('GET', "/file/lines", req_file_lines)
     app.router.add_route('GET', "/file/info", req_file_info)
     app.router.add_route('POST', "/execute", req_launch)
     app.router.add_route('GET', "/result", req_result)
