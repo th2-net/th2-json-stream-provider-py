@@ -640,7 +640,7 @@ async def req_file_lines(req: Request) -> Response:
                         lines.append(line)
                     if end is not None and i > end:
                         break
-                content = '\n'.join(lines)
+                content = '['+','.join(lines)+']'
         return web.json_response({'result': content})
     except Exception as error:
         logger.warning(f"Filter {path_arg} file by [{start_arg},{end_arg}] range failure", error)
