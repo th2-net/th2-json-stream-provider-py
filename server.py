@@ -13,6 +13,8 @@
 #  limitations under the License.
 
 import asyncio
+import re
+
 import orjson
 import logging.config
 import os
@@ -700,6 +702,123 @@ def _file_info(path_value: str, interval_value: int) -> dict[str, Any]:
     return {'lines': line_count, 'intervals': intervals}
 
 
+def _count_pattern_matches(line: str, patterns: list[str]) -> int:
+    matched_indices: set[int] = set[int]()
+    count = 0
+    for pattern in patterns:
+        # Using case-insensitive regex search
+        for match in re.finditer(re.escape(pattern), line, re.IGNORECASE):
+            start, end = match.start(), match.end()
+
+            # Check if this match overlaps with already counted matches
+            if any(i in matched_indices for i in range(start, end)):
+                continue
+
+            # Mark indices as matched to avoid double-counting
+            matched_indices.update(range(start, end))
+            count += 1
+
+    return count
+
+
+async def req_file_search(req: Request) -> Response:
+    """
+    ---
+    description: This end-point allows to get number of matched patterns in file.
+    args:
+    - path (required) - path to file
+    - interval (optional) - interval size for splitting file to blocks and extract firs / last display-timestamp for them
+    - pattern (required) - set of patterns for matching calculation
+    tags:
+    - File operation
+    produces:
+    - application/json
+    responses:
+        "200":
+            description: successful operation. Return file's info json.
+        "404":
+            description: failed operation. requested file doesn't exist
+              or requested path didn't start with ./results or ./notebooks.
+        "422"
+            interval isn't positive int
+        "500":
+            file can't be read
+
+    """
+    global tasks
+    global logger
+    path_arg = req.rel_url.query.get('path', '')
+    interval_arg = req.rel_url.query.get('interval')
+    try:
+        pattern_args = req.rel_url.query.getall('pattern')
+    except Exception as error:
+        logger.warning("Request doesn't contain 'pattern' parameter", error)
+        return web.HTTPBadRequest(reason=f"Request doesn't contain 'pattern' parameter: {error}")
+
+    logger.info(f"/file/search?path={path_arg}&interval={interval_arg}&pattern={pattern_args}")
+    try:
+        absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
+    except Exception as error:
+        logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}: {error}")
+    if not path_arg or not os.path.isfile(absolute_path):
+        return web.HTTPNotFound()
+
+    try:
+        interval_value = _validate_interval_arg(interval_arg)
+    except Exception as error:
+        logger.warning(f"'{interval_arg}' interval is incorrect", error)
+        return web.HTTPUnprocessableEntity(reason=f"'{interval_arg}' interval is incorrect: {error}")
+
+    patterns: list[str] = [item.strip() for item in pattern_args if item.strip()]
+    patterns.sort(key=lambda p: len(p), reverse=True)
+    if not patterns:
+        logger.warning(f"Requested '{patterns}' list of not blank patterns can't be empty")
+        return web.HTTPBadRequest(reason=f"Requested '{patterns}' list of not blank patterns can't be empty")
+
+    try:
+        intervals: list[dict[str, int]] = []
+        line_count = 0
+        matches_total = 0
+        with open(absolute_path, "r") as f:
+            interval: dict[str, int] = {}
+            matches_in_interval = 0
+            for line in f:
+                matches_in_line = _count_pattern_matches(line, patterns)
+                matches_total += matches_in_line
+                matches_in_interval += matches_in_line
+
+                if interval_value > 0:
+                    if interval_value == 1:
+                        if matches_in_interval > 0:
+                            interval['first-line'] = line_count
+                            interval['matches'] = matches_in_interval
+                            interval['last-line'] = line_count
+                            intervals.append(interval)
+                        interval = {}
+                        matches_in_interval = 0
+                    elif line_count % interval_value == 0:
+                        interval['first-line'] = line_count
+                    elif (line_count + 1) % interval_value == 0:
+                        if matches_in_interval > 0:
+                            interval['matches'] = matches_in_interval
+                            interval['last-line'] = line_count
+                            intervals.append(interval)
+                        interval = {}
+                        matches_in_interval = 0
+
+                line_count += 1
+
+            if interval and matches_in_interval > 0:
+                interval['matches'] = matches_in_interval
+                interval['last-line'] = line_count - 1
+                intervals.append(interval)
+
+        return web.json_response({'total-matches': matches_total, 'intervals': intervals})
+    except Exception as error:
+        logger.warning(f"Lines number calculation for {absolute_path} path failure", error)
+        return web.HTTPInternalServerError(reason=f"Lines number calculation for {absolute_path} path failure: {error}")
+
 async def req_file_info(req: Request) -> Response:
     """
     ---
@@ -914,6 +1033,7 @@ if __name__ == '__main__':
     app.router.add_route('GET', "/files", req_parameters)
     app.router.add_route('GET', "/file", req_file)
     app.router.add_route('GET', "/file/lines", req_file_lines)
+    app.router.add_route('GET', "/file/search", req_file_search)
     app.router.add_route('GET', "/file/info", req_file_info)
     app.router.add_route('POST', "/execute", req_launch)
     app.router.add_route('GET', "/result", req_result)
