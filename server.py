@@ -1,4 +1,4 @@
-#  Copyright 2024 Exactpro (Exactpro Systems Limited)
+#  Copyright 2024-2025 Exactpro (Exactpro Systems Limited)
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -13,7 +13,9 @@
 #  limitations under the License.
 
 import asyncio
-import json
+import re
+
+import orjson
 import logging.config
 import os
 from argparse import ArgumentParser
@@ -41,6 +43,7 @@ from json_stream_provider.log_configuratior import configure_logging
 from json_stream_provider.papermill_execute_ext import DEFAULT_ENGINE_USER_ID
 
 ENGINE_USER_ID_COOKIE_KEY = 'engine_user_id'
+DISPLAY_TIMESTAMP_FIELD = '#display-timestamp'
 
 os.system('pip list')
 
@@ -97,7 +100,7 @@ def read_config(path: str):
     global logger
     try:
         file = open(path, "r")
-        cfg = json.load(file)
+        cfg = orjson.loads(file.read())
 
         notebooks_dir = os.path.abspath(cfg.get('notebooks', notebooks_dir))
         logger.info('notebooks_dir=%s', notebooks_dir)
@@ -564,6 +567,307 @@ async def req_file(req: Request) -> Response:
     return web.json_response({'result': content})
 
 
+async def req_file_lines(req: Request) -> Response:
+    """
+    ---
+    description: This end-point allows to get part of file.
+    args:
+    - path (required) - path to file
+    - start (option) - the number of the first requested lines otherwise min
+    - end (option) - the number of the last requested lines otherwise max
+    tags:
+    - File operation
+    produces:
+    - application/json
+    responses:
+        "200":
+            description: successful operation. Return file's json.
+        "404":
+            description: failed operation. requested file doesn't exist
+              or requested path didn't start with ./results or ./notebooks.
+        "422"
+            start isn't positive int
+              or end isn't positive int
+              or start > end
+        "500":
+            file can't be read
+    """
+    global tasks
+    global logger
+    path_arg = req.rel_url.query.get('path', '')
+    start_arg = req.rel_url.query.get('start')
+    end_arg = req.rel_url.query.get('end')
+    logger.info(f"/file/lines?path={path_arg}&start={start_arg}&end={end_arg}")
+    try:
+        absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
+    except Exception as error:
+        logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}")
+    if not path_arg or not os.path.isfile(absolute_path):
+        return web.HTTPNotFound()
+
+    try:
+        start = None if start_arg is None else int(start_arg)
+    except ValueError as error:
+        logger.warning(f"'{start_arg}' start isn't valid int", error)
+        return web.HTTPUnprocessableEntity(reason=f"'{start_arg}' start isn't valid int")
+
+    if start is not None and start < 0:
+        logger.warning(f"'{start_arg}' start can't be negative")
+        return web.HTTPUnprocessableEntity(reason=f"'{start_arg}' start can't be negative")
+
+    try:
+        end = None if end_arg is None else int(end_arg)
+    except ValueError as error:
+        logger.warning(f"'{end_arg}' end isn't valid int", error)
+        return web.HTTPUnprocessableEntity(reason=f"'{end_arg}' start isn't valid int")
+
+    if end is not None and end < 0:
+        logger.warning(f"'{end_arg}' end can't be negative")
+        return web.HTTPUnprocessableEntity(reason=f"'{end_arg}' end can't be negative")
+
+    if start is not None and end is not None and start > end:
+        logger.warning(f"'{start}' start > '{end}' end argument")
+        return web.HTTPUnprocessableEntity(reason=f"'{start}' start > '{end}' end argument")
+
+    try:
+        content: str
+        with open(absolute_path, "r") as f:
+            if start is None and end is None:
+                content = f.read()
+            else:
+                lines: list[str] = []
+                for i, line in enumerate(f):
+                    if (start is None or start <= i) and (end is None or i <= end):
+                        lines.append(line)
+                    if end is not None and i > end:
+                        break
+                content = '['+','.join(lines)+']'
+        return web.json_response({'result': content})
+    except Exception as error:
+        logger.warning(f"Filter {path_arg} file by [{start_arg},{end_arg}] range failure", error)
+        return web.HTTPInternalServerError(reason=f"Filter {path_arg} file by [{start_arg},{end_arg}] failure: {error}")
+
+
+def _append_interval(interval: dict[str, int], path_value: str, line_num: int, line: str, alias: str):
+    interval[f"{alias}-line"] = line_num
+    try:
+        obj = orjson.loads(line)
+        timestamp = obj.get(DISPLAY_TIMESTAMP_FIELD)
+        if timestamp is not None:
+            interval[f"{alias}-display-timestamp"] = timestamp
+    except Exception as error:
+        logger.warning(f"The {line_num} line from {path_value} can't be analyzed", error)
+
+
+def _validate_interval_arg(interval_arg: str) -> int:
+    try:
+        interval_size = 0 if interval_arg is None else int(interval_arg)
+    except ValueError as error:
+        raise ValueError(f"'{interval_arg}' interval isn't valid int") from error
+
+    if interval_size < 0:
+        raise ValueError(f"'{interval_arg}' interval can't be negative")
+
+    return interval_size
+
+def _file_info(path_value: str, interval_value: int) -> dict[str, Any]:
+    intervals: list[dict[str, int]] = []
+    line_count = 0
+    with open(path_value, "r") as f:
+        interval: dict[str, int] = {}
+        last_line: str
+        for line in f:
+            if interval_value > 0:
+                last_line = line
+
+                if interval_value == 1:
+                    _append_interval(interval, path_value, line_count, line, 'first')
+                    _append_interval(interval, path_value, line_count, line, 'last')
+                    intervals.append(interval)
+                    interval = {}
+                elif line_count % interval_value == 0:
+                    _append_interval(interval, path_value, line_count, line, 'first')
+                elif (line_count + 1) % interval_value == 0:
+                    _append_interval(interval, path_value, line_count, line, 'last')
+                    intervals.append(interval)
+                    interval = {}
+
+            line_count += 1
+
+        if interval:
+            _append_interval(interval, path_value, line_count - 1, last_line, 'last')
+            intervals.append(interval)
+
+    return {'lines': line_count, 'intervals': intervals}
+
+
+def _count_pattern_matches(line: str, patterns: list[str]) -> int:
+    matched_indices: set[int] = set[int]()
+    count = 0
+    for pattern in patterns:
+        # Using case-insensitive regex search
+        for match in re.finditer(re.escape(pattern), line, re.IGNORECASE):
+            start, end = match.start(), match.end()
+
+            # Check if this match overlaps with already counted matches
+            if any(i in matched_indices for i in range(start, end)):
+                continue
+
+            # Mark indices as matched to avoid double-counting
+            matched_indices.update(range(start, end))
+            count += 1
+
+    return count
+
+
+async def req_file_search(req: Request) -> Response:
+    """
+    ---
+    description: This end-point allows to get number of matched patterns in file.
+    args:
+    - path (required) - path to file
+    - interval (optional) - interval size for splitting file to blocks and extract firs / last display-timestamp for them
+    - pattern (required) - set of patterns for matching calculation
+    tags:
+    - File operation
+    produces:
+    - application/json
+    responses:
+        "200":
+            description: successful operation. Return file's info json.
+        "404":
+            description: failed operation. requested file doesn't exist
+              or requested path didn't start with ./results or ./notebooks.
+        "422"
+            interval isn't positive int
+        "500":
+            file can't be read
+
+    """
+    global tasks
+    global logger
+    path_arg = req.rel_url.query.get('path', '')
+    interval_arg = req.rel_url.query.get('interval')
+    try:
+        pattern_args = req.rel_url.query.getall('pattern')
+    except Exception as error:
+        logger.warning("Request doesn't contain 'pattern' parameter", error)
+        return web.HTTPBadRequest(reason=f"Request doesn't contain 'pattern' parameter: {error}")
+
+    logger.info(f"/file/search?path={path_arg}&interval={interval_arg}&pattern={pattern_args}")
+    try:
+        absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
+    except Exception as error:
+        logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}: {error}")
+    if not path_arg or not os.path.isfile(absolute_path):
+        return web.HTTPNotFound()
+
+    try:
+        interval_value = _validate_interval_arg(interval_arg)
+    except Exception as error:
+        logger.warning(f"'{interval_arg}' interval is incorrect", error)
+        return web.HTTPUnprocessableEntity(reason=f"'{interval_arg}' interval is incorrect: {error}")
+
+    patterns: list[str] = [item.strip() for item in pattern_args if item.strip()]
+    patterns.sort(key=lambda p: len(p), reverse=True)
+    if not patterns:
+        logger.warning(f"Requested '{patterns}' list of not blank patterns can't be empty")
+        return web.HTTPBadRequest(reason=f"Requested '{patterns}' list of not blank patterns can't be empty")
+
+    try:
+        intervals: list[dict[str, int]] = []
+        line_count = 0
+        matches_total = 0
+        with open(absolute_path, "r") as f:
+            interval: dict[str, int] = {}
+            matches_in_interval = 0
+            for line in f:
+                matches_in_line = _count_pattern_matches(line, patterns)
+                matches_total += matches_in_line
+                matches_in_interval += matches_in_line
+
+                if interval_value > 0:
+                    if interval_value == 1:
+                        if matches_in_interval > 0:
+                            interval['first-line'] = line_count
+                            interval['matches'] = matches_in_interval
+                            interval['last-line'] = line_count
+                            intervals.append(interval)
+                        interval = {}
+                        matches_in_interval = 0
+                    elif line_count % interval_value == 0:
+                        interval['first-line'] = line_count
+                    elif (line_count + 1) % interval_value == 0:
+                        if matches_in_interval > 0:
+                            interval['matches'] = matches_in_interval
+                            interval['last-line'] = line_count
+                            intervals.append(interval)
+                        interval = {}
+                        matches_in_interval = 0
+
+                line_count += 1
+
+            if interval and matches_in_interval > 0:
+                interval['matches'] = matches_in_interval
+                interval['last-line'] = line_count - 1
+                intervals.append(interval)
+
+        return web.json_response({'total-matches': matches_total, 'intervals': intervals})
+    except Exception as error:
+        logger.warning(f"Lines number calculation for {absolute_path} path failure", error)
+        return web.HTTPInternalServerError(reason=f"Lines number calculation for {absolute_path} path failure: {error}")
+
+async def req_file_info(req: Request) -> Response:
+    """
+    ---
+    description: This end-point allows to get file info.
+    args:
+    - path (required) - path to file
+    - interval (optional) - interval size for splitting file to blocks and extract firs / last display-timestamp for them
+    tags:
+    - File operation
+    produces:
+    - application/json
+    responses:
+        "200":
+            description: successful operation. Return file's info json.
+        "404":
+            description: failed operation. requested file doesn't exist
+              or requested path didn't start with ./results or ./notebooks.
+        "422"
+            interval isn't positive int
+        "500":
+            file can't be read
+
+    """
+    global tasks
+    global logger
+    path_arg = req.rel_url.query.get('path', '')
+    interval_arg = req.rel_url.query.get('interval')
+    logger.info(f"/file/info?path={path_arg}&interval={interval_arg}")
+    try:
+        absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
+    except Exception as error:
+        logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}")
+    if not path_arg or not os.path.isfile(absolute_path):
+        return web.HTTPNotFound()
+
+    try:
+        interval_value = _validate_interval_arg(interval_arg)
+    except Exception as error:
+        logger.warning(f"'{interval_arg}' interval is incorrect", error)
+        return web.HTTPUnprocessableEntity(reason=f"'{interval_arg}' interval is incorrect: {error}")
+
+    try:
+        return web.json_response(_file_info(absolute_path, interval_value))
+    except Exception as error:
+        logger.warning(f"Lines number calculation for {absolute_path} path failure", error)
+        return web.HTTPInternalServerError(reason=f"Lines number calculation for {absolute_path} path failure: {error}")
+
+
 async def req_result(req: Request) -> Response:
     """
     ---
@@ -617,6 +921,73 @@ async def req_result(req: Request) -> Response:
         return web.HTTPNotFound()
 
 
+async def req_result_info(req: Request) -> Response:
+    """
+    ---
+    description: This end-point allows to get result info.
+    args:
+    - id (required) - id of run task
+    - interval (optional) - interval size for splitting file to blocks and extract firs / last display-timestamp for them
+    tags:
+    - Execution operation
+    produces:
+    - application/json
+    responses:
+        "200":
+            description: successful operation. Return different data depending on status:
+                'in progress': return json with task's status
+                'success': return result file's info json.
+                'error': return json with reason of failed run
+        "400":
+            description: failed operation. body with parameters not present.
+        "404":
+            description: failed operation. requested task doesn't exist
+              or resulting file doesn't exist or status is unknown.
+        "422"
+            interval isn't positive int
+        "500":
+            file can't be read
+    """
+    global tasks
+    global logger
+    task_id = req.rel_url.query.get('id')
+    interval_arg = req.rel_url.query.get('interval')
+    logger.debug(f"/result/info?id={task_id}&interval={interval_arg}")
+    task: TaskMetadata = tasks.get(task_id)
+    if task is None:
+        return web.HTTPNotFound(reason="Requested task doesn't exist")
+
+    try:
+        interval_value = _validate_interval_arg(interval_arg)
+    except Exception as error:
+        logger.warning(f"'{interval_arg}' interval is incorrect", error)
+        return web.HTTPUnprocessableEntity(reason=f"'{interval_arg}' interval is incorrect: {error}")
+
+    status = task.status
+    if status == TaskStatus.IN_PROGRESS:
+        return web.json_response({'status': status.value})
+    elif status == TaskStatus.SUCCESS:
+        path_value = task.result
+        if not path_value or not os.path.isfile(path_value):
+            return web.HTTPNotFound(reason="Resulting file doesn't exist")
+
+        try:
+            info: dict[str, Any] = _file_info(path_value, interval_value)
+            info['status'] = status.value
+            info['path'] = path_value
+            return web.json_response(info)
+        except Exception as error:
+            logger.warning(f"Lines number calculation for {path_value} path failure", error)
+            return web.HTTPInternalServerError(
+                reason=f"Lines number calculation for {path_value} path failure: {error}")
+
+    elif status == TaskStatus.FAILED:
+        error: Exception = task.result
+        return web.json_response({'status': status.value, 'result': str(error)})
+    else:
+        return web.HTTPNotFound()
+
+
 async def req_stop(req: Request) -> Response:
     """
     ---
@@ -661,8 +1032,12 @@ if __name__ == '__main__':
     app.router.add_route('GET', "/files/all", req_files)
     app.router.add_route('GET', "/files", req_parameters)
     app.router.add_route('GET', "/file", req_file)
+    app.router.add_route('GET', "/file/lines", req_file_lines)
+    app.router.add_route('GET', "/file/search", req_file_search)
+    app.router.add_route('GET', "/file/info", req_file_info)
     app.router.add_route('POST', "/execute", req_launch)
     app.router.add_route('GET', "/result", req_result)
+    app.router.add_route('GET', "/result/info", req_result_info)
     app.router.add_route('POST', "/stop", req_stop)
     setup_swagger(app)
     logger.info('starting server')
