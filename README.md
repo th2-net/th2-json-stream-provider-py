@@ -190,27 +190,62 @@ chgrp -R users user_data/
 chmod -R g=u user_data/
 ```
 
-#### start command
-```shell
-cd local-run/with-jupyter-notebook
-docker compose up --build
-```
-#### clean command
-```shell
-cd local-run/with-jupyter-notebook
-docker compose rm --force --volumes --stop
-docker compose down --volumes
-docker compose build
-```
-#### application URLs:
-* http://localhost - th2-rpt-viewer
-* http://localhost/jupyter - jupyter-notebook. You can authorise via token printed into `jupyter_notebook` logs:
+#### if you use docker
+* ##### start command
   ```shell
   cd local-run/with-jupyter-notebook
-  docker compose logs jupyter_notebook | grep 'jupyter/lab?token=' | tail -1 | cut -d '=' -f 2
+  docker compose up --build
+  ```
+* ##### clean command
+  ```shell
+  cd local-run/with-jupyter-notebook
+  docker compose rm --force --volumes --stop
+  docker compose down --volumes
+  docker compose build
   ```
 
+#### if you use podman
+* ##### start command
+  ```shell
+  cd local-run/with-jupyter-notebook
+  docker-compose up
+  ```
+* ##### rebuild command
+  ```shell
+  cd local-run/with-jupyter-notebook
+  docker-compose build
+  ```
+* ##### clean command
+  ```shell
+  cd local-run/with-jupyter-notebook
+  docker-compose rm --force --volumes --stop
+  docker-compose down --volumes
+  docker-compose build
+  ```
+
+#### application URLs:
+* http://localhost:8080 - th2-rpt-viewer
+* http://localhost:8082 - jupyter-notebook. 
+  You can authorise via token printed into `jupyter_notebook` logs:
+  * if you use docker
+    ```shell
+    cd local-run/with-jupyter-notebook
+    docker compose logs jupyter_notebook | grep '/lab?token=' | tail -1 | cut -d '=' -f 2
+    ```
+  * if you use podman
+    ```shell
+    cd local-run/with-jupyter-notebook
+    docker-compose logs jupyter_notebook | grep '/lab?token=' | tail -1 | cut -d '=' -f 2
+    ```
+
 ## Release notes:
+
+### 0.1.0
+
+* Updated python: `3.11.6`
+* j-sp returns full paths via REST API
+* changed URLs for apps when local run used
+* added commands for podman
 
 ### 0.0.7
 
