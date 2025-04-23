@@ -28,7 +28,7 @@ services:
       - th2_network
 
   th2_rpt_viewer:
-    image: ghcr.io/th2-net/th2-rpt-viewer:5.2.11-improve-json-viewer-performance-14616003063
+    image: ghcr.io/th2-net/th2-rpt-viewer:5.2.11-improve-json-viewer-performance-14620149066
     ports:
       - "8083:8080"
     networks:
