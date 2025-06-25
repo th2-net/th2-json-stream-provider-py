@@ -1,0 +1,18 @@
+name: Scan licenses and vulnerabilities in java project
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 1'
+
+jobs:
+  scan:
+    name: Vulnerabilities scan
+    uses: th2-net/.github/.github/workflows/python-scan.yml@main
+  license:
+    name: License scan
+    needs: [ get-version ]
+    uses: h2-net/.github/.github/workflows/python-license-check.yml
+    with:
+      version: ${{ needs.get-version.outputs.version }}
+      python-version: 3.9

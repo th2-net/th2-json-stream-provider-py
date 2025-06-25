@@ -4,7 +4,7 @@ on: workflow_dispatch
 
 jobs:
   get-version:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Get package version
@@ -23,10 +23,18 @@ jobs:
     name: Vulnerabilities scan
     uses: th2-net/.github/.github/workflows/python-scan.yml@main
 
+  license:
+    name: License scan
+    needs: [ get-version ]
+    uses: h2-net/.github/.github/workflows/python-license-check.yml
+    with:
+      version: ${{ needs.get-version.outputs.version }}
+      python-version: 3.9
+
   docker-push:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     name: Build Docker image and push to ghcr.io
-    needs: [ get-version, scan ]
+    needs: [ get-version, scan, license ]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
