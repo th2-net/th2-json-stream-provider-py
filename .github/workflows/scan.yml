@@ -12,7 +12,7 @@ jobs:
   license:
     name: License scan
     needs: [ get-version ]
-    uses: h2-net/.github/.github/workflows/python-license-check.yml
+    uses: th2-net/.github/.github/workflows/python-license-check.yml@main
     with:
       version: ${{ needs.get-version.outputs.version }}
       python-version: 3.9
