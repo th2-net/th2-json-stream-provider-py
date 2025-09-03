@@ -593,28 +593,33 @@ async def req_result(req: Request) -> Response:
     if task is None:
         return web.HTTPNotFound(reason="Requested task doesn't exist")
     status = task.status
-    if status == TaskStatus.IN_PROGRESS:
-        return web.json_response({'status': status.value})
-    elif status == TaskStatus.SUCCESS:
-        path_param = task.result
-        if not path_param or not os.path.isfile(path_param):
-            return web.HTTPNotFound(reason="Resulting file doesn't exist")
-        customization_param = task.customization
-        customization = "[]"
-        if len(customization_param) > 0 and os.path.isfile(customization_param):
-            customization_file = open(customization_param, "r")
-            customization = customization_file.read()
-            customization_file.close()
-        file = open(path_param, "r")
-        content = file.read()
-        file.close()
-        return web.json_response(
-            {'status': status.value, 'result': content, 'customization': customization, 'path': path_param})
-    elif status == TaskStatus.FAILED:
-        error: Exception = task.result
-        return web.json_response({'status': status.value, 'result': str(error)})
-    else:
-        return web.HTTPNotFound()
+    start = datetime.now()
+    try:
+        if status == TaskStatus.IN_PROGRESS:
+            return web.json_response({'status': status.value})
+        elif status == TaskStatus.SUCCESS:
+            path_param = task.result
+            if not path_param or not os.path.isfile(path_param):
+                return web.HTTPNotFound(reason="Resulting file doesn't exist")
+            customization_param = task.customization
+            customization = "[]"
+            if len(customization_param) > 0 and os.path.isfile(customization_param):
+                customization_file = open(customization_param, "r")
+                customization = customization_file.read()
+                customization_file.close()
+            file = open(path_param, "r")
+            content = file.read()
+            file.close()
+            return web.json_response(
+                {'status': status.value, 'result': content, 'customization': customization, 'path': path_param})
+        elif status == TaskStatus.FAILED:
+            error: Exception = task.result
+            return web.json_response({'status': status.value, 'result': str(error)})
+        else:
+            return web.HTTPNotFound()
+    finally:
+        logger.debug('/result?id={task_id}, status: {status}, duration: {duration}'
+                     .format(task_id=str(task_id), status=str(status), duration=str(datetime.now() - start)))
 
 
 async def req_stop(req: Request) -> Response:
