@@ -1,4 +1,4 @@
-#  Copyright 2024 Exactpro (Exactpro Systems Limited)
+#  Copyright 2024-2025 Exactpro (Exactpro Systems Limited)
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ from papermill.utils import chdir
 from json_stream_provider import papermill_execute_ext as epm
 from json_stream_provider.custom_engines import CustomEngine, EngineBusyError
 from json_stream_provider.custom_python_translator import CustomPythonTranslator
+from json_stream_provider.error_utils import prepare_response_error
 from json_stream_provider.log_configuratior import configure_logging
 from json_stream_provider.papermill_execute_ext import DEFAULT_ENGINE_USER_ID
 
@@ -593,28 +594,33 @@ async def req_result(req: Request) -> Response:
     if task is None:
         return web.HTTPNotFound(reason="Requested task doesn't exist")
     status = task.status
-    if status == TaskStatus.IN_PROGRESS:
-        return web.json_response({'status': status.value})
-    elif status == TaskStatus.SUCCESS:
-        path_param = task.result
-        if not path_param or not os.path.isfile(path_param):
-            return web.HTTPNotFound(reason="Resulting file doesn't exist")
-        customization_param = task.customization
-        customization = "[]"
-        if len(customization_param) > 0 and os.path.isfile(customization_param):
-            customization_file = open(customization_param, "r")
-            customization = customization_file.read()
-            customization_file.close()
-        file = open(path_param, "r")
-        content = file.read()
-        file.close()
-        return web.json_response(
-            {'status': status.value, 'result': content, 'customization': customization, 'path': path_param})
-    elif status == TaskStatus.FAILED:
-        error: Exception = task.result
-        return web.json_response({'status': status.value, 'result': str(error)})
-    else:
-        return web.HTTPNotFound()
+    start = datetime.now()
+    try:
+        if status == TaskStatus.IN_PROGRESS:
+            return web.json_response({'status': status.value})
+        elif status == TaskStatus.SUCCESS:
+            path_param = task.result
+            if not path_param or not os.path.isfile(path_param):
+                return web.HTTPNotFound(reason="Resulting file doesn't exist")
+            customization_param = task.customization
+            customization = "[]"
+            if len(customization_param) > 0 and os.path.isfile(customization_param):
+                customization_file = open(customization_param, "r")
+                customization = customization_file.read()
+                customization_file.close()
+            file = open(path_param, "r")
+            content = file.read()
+            file.close()
+            return web.json_response(
+                {'status': status.value, 'result': content, 'customization': customization, 'path': path_param})
+        elif status == TaskStatus.FAILED:
+            short_error, detailed_error = prepare_response_error(task.result)
+            return web.json_response({'status': status.value, 'result': short_error, 'details': detailed_error})
+        else:
+            return web.HTTPNotFound()
+    finally:
+        logger.debug('/result?id={task_id}, status: {status}, duration: {duration}'
+                     .format(task_id=str(task_id), status=str(status), duration=str(datetime.now() - start)))
 
 
 async def req_stop(req: Request) -> Response:
@@ -643,6 +649,7 @@ async def req_stop(req: Request) -> Response:
         logger.warning("failed to stop process", error)
         return web.HTTPInternalServerError(reason='failed to stop process')
     return web.HTTPOk()
+
 
 
 if __name__ == '__main__':

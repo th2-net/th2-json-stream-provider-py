@@ -1,4 +1,4 @@
-#  Copyright 2024 Exactpro (Exactpro Systems Limited)
+#  Copyright 2024-2025 Exactpro (Exactpro Systems Limited)
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -18,6 +18,10 @@ from papermill.models import Parameter
 from papermill.translators import PythonTranslator, papermill_translators
 
 class CustomPythonTranslator(PythonTranslator):
+    # Pattern to capture parameters within cell input
+    PARAMETER_PATTERN = re.compile(
+        r"^(?P<target>\w[\w_]*)\s*(:\s*[\"']?(?P<annotation>\w[\w_\[\],\s]*)[\"']?\s*)?=\s*(?P<value>(\"\"\"(?:\\.|[^\\])*?\"\"\"|\'\'\'(?:\\.|[^\\])*?\'\'\'|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|[^\#]*?))(\s*#\s*(type:\s*(?P<type_comment>[^\s]*)\s*)?(?P<help>.*))?$"
+    )
     logger: logging.Logger
 
     @classmethod
