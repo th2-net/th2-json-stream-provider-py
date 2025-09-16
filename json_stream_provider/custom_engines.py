@@ -83,7 +83,9 @@ class EngineHolder:
         return self._last_used_time
 
     def close(self):
-        self._client = None
+        if self._client is not None:
+            self._client.shutdown_kernel()
+            self._client = None
 
     def _get_last_used_date_time(self):
         return datetime.fromtimestamp(self._last_used_time)
