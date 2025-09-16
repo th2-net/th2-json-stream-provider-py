@@ -1,4 +1,4 @@
-#  Copyright 2024 Exactpro (Exactpro Systems Limited)
+#  Copyright 2024-2025 Exactpro (Exactpro Systems Limited)
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -215,7 +215,7 @@ class CustomEngine(NBClientEngine):
                 stdout_file=stdout_file,
                 stderr_file=stderr_file,
             )
-            cls.logger.info(f"Created papermill notebook client for {key}")
+            cls.logger.info('Created papermill notebook client for %s', key)
             return PapermillNotebookClient(nb_man, **final_kwargs)
 
         engine_holder: EngineHolder = cls.get_or_create_engine_metadata(key, create_client)
@@ -249,8 +249,10 @@ class CustomEngine(NBClientEngine):
         for key in out_of_use_engines:
             engine_holder: EngineHolder = cls.metadata_dict.pop(key)
             engine_holder.close()
-            cls.logger.info(
-                f"unregistered '{key}' papermill engine, last used time {now - engine_holder.get_last_used_time()} sec ago")
+            if cls.logger.isEnabledFor(logging.INFO):
+                cls.logger.info(
+                    f"unregistered '{key}' papermill engine, last used time "
+                    f"{now - engine_holder.get_last_used_time()} sec ago")
 
 
 class CustomEngines(PapermillEngines):
