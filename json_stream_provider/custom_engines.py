@@ -83,9 +83,13 @@ class EngineHolder:
     def get_last_used_time(self) -> float:
         return self._last_used_time
 
+    def restart(self):
+        if self._client is not None:
+            self._client.kc.shutdown(True)
+
     def close(self):
         if self._client is not None:
-            self._client.shutdown_kernel()
+            self._client.kc.shutdown()
             self._client = None
 
     def _get_last_used_date_time(self):
@@ -226,7 +230,7 @@ class CustomEngine(NBClientEngine):
             return await engine_holder.async_execute(nb_man)
         except DeadKernelError as error:
             cls.logger.error('Client related to %s is died', key, exc_info=error)
-            cls.remove_engine(key)
+            cls.restart_engine(key)
             raise error
 
 
@@ -248,6 +252,13 @@ class CustomEngine(NBClientEngine):
             cls.metadata_dict[key] = engine_holder
 
         return engine_holder
+
+    @classmethod
+    def restart_engine(cls, key: EngineKey):
+        engine_holder: EngineHolder = cls.metadata_dict.pop(key)
+        if engine_holder is not None:
+            engine_holder.restart()
+            cls.logger.info("restarted '%s' papermill engine", key)
 
     @classmethod
     def remove_engine(cls, key: EngineKey):
