@@ -1,4 +1,4 @@
-# th2-json-stream-provider (j-sp) (0.0.8)
+# th2-json-stream-provider (j-sp) (0.0.9)
 
 This python server is made to launch Jupyter notebooks (*.ipynb) and get results from them.
 
@@ -215,6 +215,10 @@ docker compose build
   ```
 
 ## Release notes:
+
+### 0.0.9
+
+* fixed [GH-21: json-stream-provider doesn't restart Python Kernel automatically](https://github.com/th2-net/th2-json-stream-provider-py/issues/21)
 
 ### 0.0.8
 
