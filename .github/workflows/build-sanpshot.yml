@@ -1,4 +1,4 @@
-name: Build and publish Docker image to Github Container Registry ghcr.io
+name: Build snapshot
 
 on:
   push:

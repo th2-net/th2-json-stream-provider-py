@@ -1,0 +1,14 @@
+{
+  "jsonlReaderTab": {
+    "searchTokens": [
+      {
+        "pattern": "PASS",
+        "color": "green"
+      },
+      {
+        "pattern": "FAIL",
+        "color": "red"
+      }
+    ]
+  }
+}

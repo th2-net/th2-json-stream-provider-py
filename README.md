@@ -1,4 +1,4 @@
-# th2-json-stream-provider (j-sp) (0.0.7)
+# th2-json-stream-provider (j-sp) (0.0.8)
 
 This python server is made to launch Jupyter notebooks (*.ipynb) and get results from them.
 
@@ -8,6 +8,7 @@ This python server is made to launch Jupyter notebooks (*.ipynb) and get results
 
 * `notebooks` (Default value: /home/jupyter-notebook/) - path to the directory with notebooks. `j-sp` search files with `ipynb` extension recursively in the specified folder.
 * `results` (Default value: /home/jupyter-notebook/results) - path to the directory for run results. `j-sp` resolves result file with `jsonl` extension against specified folder.
+* `results-images` (Default value: /home/jovyan/j-sp/results/images) - path to the directory for images prepared during notebook run. `j-sp` provides `/image?path=<full path to image>` endpoint for getting stored images.
 * `logs` (Default value: /home/jupyter-notebook/logs) - path to the directory for run logs. `j-sp` puts run logs to specified folder.
 * `out-of-use-engine-time` (Default value: 3600) - out-of-use time interval in seconds. `j-sp` unregisters engine related to a notebook when user doesn't run the notebook more than this time
 
@@ -37,6 +38,7 @@ spec:
   customConfig:
     notebooks: /home/jupyter-notebook/
     results: /home/jupyter-notebook/j-sp/results/
+    results-images: /home/jovyan/j-sp/results/images
     logs: /home/jupyter-notebook/j-sp/logs/
     out-of-use-engine-time: 3600
   mounting:
@@ -86,6 +88,8 @@ Notebook must have a first cell with the `parameters` tag. This cell is used to 
 #### Optional parameters:
 * `customization_path` - path to [JSON](https://www.json.org/) file. Server considers a content of this file as run customization.
   `js-p` generates and passes a file path in the folder configured by `results` setting for this parameter
+* `output_images_path` - path to image folder. Server provides `/image?path=<full path to image>` endpoint for getting stored images.
+  `js-p` passes a folder path in the value configured by `results-images` setting for this parameter
 
 #### Special parameters suffixes 
 
@@ -211,6 +215,18 @@ docker compose build
   ```
 
 ## Release notes:
+
+### 0.0.8
+
+* updated:
+  * respond short error in case notebook run failure
+  * added `results-images` option to custom settings
+* fixed:
+  * `#` character in string property issue
+* update local run with jupyter-notebook:
+  * updated th2-rpt-viewer:
+    * added custom.json file for local run.
+    * updated version to `5.2.12`    
 
 ### 0.0.7
 

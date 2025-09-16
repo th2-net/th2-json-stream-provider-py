@@ -1,4 +1,4 @@
-#  Copyright 2024 Exactpro (Exactpro Systems Limited)
+#  Copyright 2024-2025 Exactpro (Exactpro Systems Limited)
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -21,11 +21,13 @@ from asyncio import Task
 from datetime import datetime, timezone
 from enum import Enum
 from logging import INFO
-from typing import Coroutine, Any
+from typing import Coroutine, Any, Union
 from uuid import uuid4
 
 import papermill as pm
 from aiohttp import web
+from aiohttp.web_exceptions import HTTPNotFound, HTTPInternalServerError
+from aiohttp.web_fileresponse import FileResponse
 from aiohttp.web_middlewares import middleware
 from aiohttp.web_request import Request
 from aiohttp.web_response import Response
@@ -37,6 +39,7 @@ from papermill.utils import chdir
 from json_stream_provider import papermill_execute_ext as epm
 from json_stream_provider.custom_engines import CustomEngine, EngineBusyError
 from json_stream_provider.custom_python_translator import CustomPythonTranslator
+from json_stream_provider.error_utils import prepare_response_error
 from json_stream_provider.log_configuratior import configure_logging
 from json_stream_provider.papermill_execute_ext import DEFAULT_ENGINE_USER_ID
 
@@ -47,6 +50,7 @@ os.system('pip list')
 server_status: str = 'ok'
 notebooks_dir: str = '/home/jupyter-notebook/'
 results_dir: str = '/home/jupyter-notebook/results/'
+results_images_dir: str = '/home/jupyter-notebook/results/images/'
 log_dir: str = '/home/jupyter-notebook/logs/'
 
 tasks: dict = {}
@@ -92,6 +96,7 @@ def create_dir(path: str):
 
 def read_config(path: str):
     global notebooks_dir
+    global results_images_dir
     global results_dir
     global log_dir
     global logger
@@ -108,6 +113,11 @@ def read_config(path: str):
         logger.info('results_dir=%s', results_dir)
         if results_dir:
             create_dir(results_dir)
+
+        results_images_dir = os.path.abspath(cfg.get('results-images', results_images_dir))
+        logger.info('results_images_dir=%s', results_images_dir)
+        if results_images_dir:
+            create_dir(results_images_dir)
 
         log_dir = os.path.abspath(cfg.get('logs', log_dir))
         logger.info('log_dir=%s', log_dir)
@@ -508,6 +518,8 @@ async def req_launch(req: Request) -> Response:
         return web.HTTPNotFound()
     if not os.path.exists(results_dir):
         return web.HTTPInternalServerError(reason='No output directory')
+    if not os.path.exists(results_images_dir):
+        return web.HTTPInternalServerError(reason='No output images directory')
     notebook_name = absolute_path.split('/')[-1].split('.')[0]
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S-%f")
     file_name = notebook_name + '_' + timestamp
@@ -521,6 +533,7 @@ async def req_launch(req: Request) -> Response:
             parameters[key] = verify_parameter(parameter)
         except Exception as error:
             return web.HTTPInternalServerError(reason=str(error))
+    parameters['output_images_path'] = results_images_dir
     parameters['output_path'] = output_path
     parameters['customization_path'] = customization_path
     task_id = str(uuid4())
@@ -553,15 +566,50 @@ async def req_file(req: Request) -> Response:
     logger.info('/file?path={path}'.format(path=str(path_arg)))
     try:
         absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
-    except Exception as error:
+        if not path_arg or not os.path.isfile(absolute_path):
+            return web.HTTPNotFound()
+        file = open(absolute_path, "r")
+        content = file.read()
+        file.close()
+        return web.json_response({'result': content})
+    except ValueError as error:
         logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
         return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}")
-    if not path_arg or not os.path.isfile(absolute_path):
-        return web.HTTPNotFound()
-    file = open(absolute_path, "r")
-    content = file.read()
-    file.close()
-    return web.json_response({'result': content})
+    except Exception as error:
+        logger.warning("failed to get file", error)
+        return web.HTTPInternalServerError(reason=str(error))
+
+
+async def req_image(req: Request) -> Union[HTTPInternalServerError, FileResponse, HTTPNotFound]:
+    """
+    ---
+    description: This end-point allows to get image from requested path. Query requires path to image.
+    tags:
+    - File operation
+    produces:
+    - raw
+    responses:
+        "200":
+            description: successful operation. Return image content.
+        "404":
+            description: failed operation. requested image doesn't exist
+              or requested path didn't start with ./results/images.
+    """
+    global tasks
+    global logger
+    path_arg = req.rel_url.query.get('path', '')
+    logger.info('/image?path={path}'.format(path=str(path_arg)))
+    try:
+        absolute_path = verify_path(path_arg, {results_images_dir})
+        if not path_arg or not os.path.isfile(absolute_path):
+            return web.HTTPNotFound()
+        return web.FileResponse(absolute_path)
+    except ValueError as error:
+        logger.warning(f"Requested {path_arg} path didn't start with {results_images_dir} ", error)
+        return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_images_dir}")
+    except Exception as error:
+        logger.warning("failed to get image", error)
+        return web.HTTPInternalServerError(reason=str(error))
 
 
 async def req_result(req: Request) -> Response:
@@ -593,28 +641,33 @@ async def req_result(req: Request) -> Response:
     if task is None:
         return web.HTTPNotFound(reason="Requested task doesn't exist")
     status = task.status
-    if status == TaskStatus.IN_PROGRESS:
-        return web.json_response({'status': status.value})
-    elif status == TaskStatus.SUCCESS:
-        path_param = task.result
-        if not path_param or not os.path.isfile(path_param):
-            return web.HTTPNotFound(reason="Resulting file doesn't exist")
-        customization_param = task.customization
-        customization = "[]"
-        if len(customization_param) > 0 and os.path.isfile(customization_param):
-            customization_file = open(customization_param, "r")
-            customization = customization_file.read()
-            customization_file.close()
-        file = open(path_param, "r")
-        content = file.read()
-        file.close()
-        return web.json_response(
-            {'status': status.value, 'result': content, 'customization': customization, 'path': path_param})
-    elif status == TaskStatus.FAILED:
-        error: Exception = task.result
-        return web.json_response({'status': status.value, 'result': str(error)})
-    else:
-        return web.HTTPNotFound()
+    start = datetime.now()
+    try:
+        if status == TaskStatus.IN_PROGRESS:
+            return web.json_response({'status': status.value})
+        elif status == TaskStatus.SUCCESS:
+            path_param = task.result
+            if not path_param or not os.path.isfile(path_param):
+                return web.HTTPNotFound(reason="Resulting file doesn't exist")
+            customization_param = task.customization
+            customization = "[]"
+            if len(customization_param) > 0 and os.path.isfile(customization_param):
+                customization_file = open(customization_param, "r")
+                customization = customization_file.read()
+                customization_file.close()
+            file = open(path_param, "r")
+            content = file.read()
+            file.close()
+            return web.json_response(
+                {'status': status.value, 'result': content, 'customization': customization, 'path': path_param})
+        elif status == TaskStatus.FAILED:
+            short_error, detailed_error = prepare_response_error(task.result)
+            return web.json_response({'status': status.value, 'result': short_error, 'details': detailed_error})
+        else:
+            return web.HTTPNotFound()
+    finally:
+        logger.debug('/result?id={task_id}, status: {status}, duration: {duration}'
+                     .format(task_id=str(task_id), status=str(status), duration=str(datetime.now() - start)))
 
 
 async def req_stop(req: Request) -> Response:
@@ -645,6 +698,7 @@ async def req_stop(req: Request) -> Response:
     return web.HTTPOk()
 
 
+
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('config')
@@ -661,6 +715,7 @@ if __name__ == '__main__':
     app.router.add_route('GET', "/files/all", req_files)
     app.router.add_route('GET', "/files", req_parameters)
     app.router.add_route('GET', "/file", req_file)
+    app.router.add_route('GET', "/image", req_image)
     app.router.add_route('POST', "/execute", req_launch)
     app.router.add_route('GET', "/result", req_result)
     app.router.add_route('POST', "/stop", req_stop)

@@ -1,5 +1,2 @@
-*.ipynb
-*.json
-*.jsonl
-
 /.idea/
+/test/
