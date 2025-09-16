@@ -41,27 +41,62 @@ spec:
     results-images: /home/jovyan/j-sp/results/images
     logs: /home/jupyter-notebook/j-sp/logs/
     out-of-use-engine-time: 3600
-  mounting:
-    - path: /home/jupyter-notebook/
-      pvcName: jupyter-notebook
-    - path: /home/json-stream/
-      pvcName: json-stream-provider
-  resources:
-    limits:
-      memory: 1000Mi
-      cpu: 1000m
-    requests:
-      memory: 100Mi
-      cpu: 100m
-  service:
-    enabled: true
-    ingress:
-      urlPaths:
-        - '/json-stream-provider/'
-    clusterIP:
-      - name: backend
-        containerPort: 8080
-        port: 8080
+  loggingConfig: |
+    [loggers]
+    keys=root,jsp,aiohttp_access
+
+    [handlers]
+    keys=consoleHandler
+
+    [formatters]
+    keys=formatter
+
+    [logger_root]
+    level=INFO
+    handlers=consoleHandler
+    propagate=0
+
+    [logger_jsp]
+    level=INFO
+    qualname=j-sp
+    handlers=consoleHandler
+    propagate=0
+
+    [logger_aiohttp_access]
+    level=WARN
+    qualname=aiohttp.access
+    handlers=consoleHandler
+    propagate=0
+
+    [handler_consoleHandler]
+    class=StreamHandler
+    formatter=formatter
+    args=(sys.stdout,)
+
+    [formatter_formatter]
+    format=%(asctime)s - %(name)s - %(levelname)s - %(message)s
+  extendedSettings:
+    mounting:
+      - path: /home/jupyter-notebook/
+        pvcName: jupyter-notebook
+      - path: /home/json-stream/
+        pvcName: json-stream-provider
+    resources:
+      limits:
+        memory: 1000Mi
+        cpu: 1000m
+      requests:
+        memory: 100Mi
+        cpu: 100m
+    service:
+      enabled: true
+      ingress:
+        urlPaths:
+          - '/json-stream-provider/'
+      clusterIP:
+        - name: backend
+          containerPort: 8080
+          port: 8080
 ```
 
 ## Jupyter's notebooks format
