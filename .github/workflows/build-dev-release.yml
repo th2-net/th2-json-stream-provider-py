@@ -1,4 +1,4 @@
-name: Build and publish dev release Docker image to Github Container Registry ghcr.io
+name: Build dev-release
 
 on: workflow_dispatch
 
