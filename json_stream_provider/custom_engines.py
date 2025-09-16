@@ -16,6 +16,7 @@ import logging
 import time
 from datetime import datetime
 
+from nbclient.exceptions import DeadKernelError
 from papermill.clientwrap import PapermillNotebookClient
 from papermill.engines import NBClientEngine, NotebookExecutionManager, PapermillEngines
 from papermill.utils import remove_args, merge_kwargs, logger
@@ -221,7 +222,13 @@ class CustomEngine(NBClientEngine):
             return PapermillNotebookClient(nb_man, **final_kwargs)
 
         engine_holder: EngineHolder = cls.get_or_create_engine_metadata(key, create_client)
-        return await engine_holder.async_execute(nb_man)
+        try:
+            return await engine_holder.async_execute(nb_man)
+        except DeadKernelError as error:
+            cls.logger.error('Client related to %s is died', key, exc_info=error)
+            cls.remove_engine(key)
+            raise error
+
 
     @classmethod
     def create_logger(cls):
@@ -241,6 +248,13 @@ class CustomEngine(NBClientEngine):
             cls.metadata_dict[key] = engine_holder
 
         return engine_holder
+
+    @classmethod
+    def remove_engine(cls, key: EngineKey):
+        engine_holder: EngineHolder = cls.metadata_dict.pop(key)
+        if engine_holder is not None:
+            engine_holder.close()
+            cls.logger.info("unregistered '%s' papermill engine", key)
 
     @classmethod
     def remove_out_of_date_engines(cls, exclude_key: EngineKey):
