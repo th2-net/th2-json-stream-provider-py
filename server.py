@@ -18,9 +18,10 @@ import logging.config
 import os
 from argparse import ArgumentParser
 from asyncio import Task
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 from logging import INFO
+from pathlib import Path
 from typing import Coroutine, Any, Union
 from uuid import uuid4
 
@@ -52,6 +53,7 @@ notebooks_dir: str = '/home/jupyter-notebook/'
 results_dir: str = '/home/jupyter-notebook/results/'
 results_images_dir: str = '/home/jupyter-notebook/results/images/'
 log_dir: str = '/home/jupyter-notebook/logs/'
+cleanup_horizon: timedelta = timedelta(weeks=2)
 
 tasks: dict = {}
 
@@ -99,6 +101,7 @@ def read_config(path: str):
     global results_images_dir
     global results_dir
     global log_dir
+    global cleanup_horizon
     global logger
     try:
         file = open(path, "r")
@@ -123,6 +126,9 @@ def read_config(path: str):
         logger.info('log_dir=%s', log_dir)
         if log_dir:
             create_dir(log_dir)
+
+        cleanup_horizon = timedelta(days=cfg.get('cleanup-horizon-days', 14))
+        logger.info('cleanup_horizon=%s', cleanup_horizon)
 
         CustomEngine.set_out_of_use_engine_time(cfg.get('out-of-use-engine-time', CustomEngine.out_of_use_engine_time))
     except Exception as e:
@@ -484,6 +490,45 @@ def verify_parameter(parameter):
         return parameter_value
 
 
+def cleanup_files():
+    global logger
+    global cleanup_horizon
+
+    if cleanup_horizon.total_seconds() < 0:
+        logger.debug('cleanup files skipped because horizon %s is negative', cleanup_horizon)
+        return
+
+    try:
+        global results_images_dir
+        global results_dir
+        global log_dir
+
+        horizon: datetime = datetime.now(timezone.utc) - cleanup_horizon
+
+        __cleanup_files_recursively(results_images_dir, horizon)
+        __cleanup_files_recursively(results_dir, horizon)
+        __cleanup_files_recursively(log_dir, horizon)
+    except Exception as e:
+        logger.error('cleanup files failure', exc_info=e)
+
+def __cleanup_files_recursively(directory: str, horizon: datetime):
+    global logger
+
+    dir_path = Path(directory).absolute()
+    if not dir_path.exists() or not dir_path.is_dir():
+        logger.warning('%s is not a valid directory for cleanup files', directory)
+        return
+
+    for root, dirs, files in os.walk(dir_path, topdown=False):
+        root_path: Path = Path(root).absolute()
+        for file_name in files:
+            file_path: Path = root_path / file_name
+            modify_time = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
+            if modify_time < horizon:
+                file_path.unlink(missing_ok=True)
+                logger.info('%s file removed, horizon: %s, last modified: %s', file_path, horizon, modify_time)
+
+
 async def req_launch(req: Request) -> Response:
     """
     ---
@@ -507,6 +552,7 @@ async def req_launch(req: Request) -> Response:
     global logger
     path_arg = req.rel_url.query.get('path', '')
     logger.info('/execute?path={path}'.format(path=str(path_arg)))
+    cleanup_files()
     if not req.can_read_body:
         return web.HTTPBadRequest(reason='Body with parameters not present')
     try:
@@ -706,6 +752,7 @@ if __name__ == '__main__':
     if cfg_path:
         read_config(cfg_path)
 
+    cleanup_files()
     app = web.Application(middlewares=[add_engine_user_id_middleware])
 
     setup(app)
