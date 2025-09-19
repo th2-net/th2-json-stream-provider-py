@@ -270,7 +270,7 @@ class CustomEngine(NBClientEngine):
 
     @classmethod
     def restart_engine(cls, key: EngineKey):
-        engine_holder: EngineHolder = cls.metadata_dict.pop(key)
+        engine_holder: EngineHolder = cls.metadata_dict.get(key)
         if engine_holder is not None:
             engine_holder.restart()
             cls.logger.info("restarted '%s' papermill engine", key)
