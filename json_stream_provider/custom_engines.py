@@ -232,6 +232,11 @@ class CustomEngine(NBClientEngine):
             cls.logger.error('Client related to %s is died', key, exc_info=error)
             cls.restart_engine(key)
             raise error
+        except RuntimeError as error:
+            if str(error).startswith("Kernel didn't respond in"):
+                cls.logger.error("Client related to %s doesn't respond", key, exc_info=error)
+                cls.restart_engine(key)
+            raise error
 
 
     @classmethod
