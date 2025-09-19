@@ -1,4 +1,4 @@
-#  Copyright 2024 Exactpro (Exactpro Systems Limited)
+#  Copyright 2024-2025 Exactpro (Exactpro Systems Limited)
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+from logging import INFO
 from pathlib import Path
 
 
@@ -131,11 +131,13 @@ async def async_execute_notebook(
     input_path = parameterize_path(input_path, path_parameters)
     output_path = parameterize_path(output_path, path_parameters)
 
-    logger.info(f"Input Notebook:  {get_pretty_path(input_path)}")
-    logger.info(f"Output Notebook: {get_pretty_path(output_path)}")
+    if logger.isEnabledFor(INFO):
+        logger.info(f"Input Notebook:  {get_pretty_path(input_path)}")
+        logger.info(f"Output Notebook: {get_pretty_path(output_path)}")
     with local_file_io_cwd():
         if cwd is not None:
-            logger.info(f"Working directory: {get_pretty_path(cwd)}")
+            if logger.isEnabledFor(INFO):
+                logger.info(f"Working directory: {get_pretty_path(cwd)}")
 
         nb = load_notebook_node(input_path)
 
@@ -145,7 +147,7 @@ async def async_execute_notebook(
             parameter_predefined = {p.name for p in parameter_predefined}
             for p in parameters:
                 if p not in parameter_predefined:
-                    logger.warning(f"Passed unknown parameter: {p}")
+                    logger.warning('Passed unknown parameter: %s', p)
             nb = parameterize_notebook(
                 nb,
                 parameters,

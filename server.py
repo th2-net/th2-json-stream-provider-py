@@ -20,7 +20,7 @@ from argparse import ArgumentParser
 from asyncio import Task
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-from logging import INFO
+from logging import INFO, DEBUG
 from pathlib import Path
 from typing import Coroutine, Any, Union
 from uuid import uuid4
@@ -130,9 +130,15 @@ def read_config(path: str):
         cleanup_horizon = timedelta(days=cfg.get('cleanup-horizon-days', 14))
         logger.info('cleanup_horizon=%s', cleanup_horizon)
 
-        CustomEngine.set_out_of_use_engine_time(cfg.get('out-of-use-engine-time', CustomEngine.out_of_use_engine_time))
+        restart_kernel_on_error = cfg.get('restart-kernel-on-error', CustomEngine.restart_kernel_on_error)
+        logger.info('restart-kernel-on-error=%s', restart_kernel_on_error)
+        out_of_use_engine_time = cfg.get('out-of-use-engine-time', CustomEngine.out_of_use_engine_time)
+        logger.info('out-of-use-engine-time=%s', out_of_use_engine_time)
+
+        CustomEngine.set_restart_kernel_on_error(restart_kernel_on_error)
+        CustomEngine.set_out_of_use_engine_time(out_of_use_engine_time)
     except Exception as e:
-        logger.error(f"Read '{path}' configuration failure", e)
+        logger.error("Read '%s' configuration failure", path, exc_info=e)
 
 
 def get_or_default_engine_user_id(req: Request) -> str:
@@ -226,7 +232,7 @@ async def req_notebooks(req: Request) -> Response:
     """
     global logger
     path_arg = req.rel_url.query.get('path', '')
-    logger.info('/files/notebooks?path={path}'.format(path=str(path_arg)))
+    logger.info('/files/notebooks?path=%s', path_arg)
     if path_arg == '':
         dirs = []
         if os.path.isdir(notebooks_dir):
@@ -244,7 +250,7 @@ async def req_notebooks(req: Request) -> Response:
     try:
         absolute_path = verify_path(path_arg, {notebooks_dir})
     except Exception as error:
-        logger.warning(f"Requested {path_arg} path didn't start with {notebooks_dir}", error)
+        logger.warning("Requested %s path didn't start with %s", path_arg, notebooks_dir, exc_info=error)
         return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {notebooks_dir}")
 
     if path_arg:
@@ -286,7 +292,7 @@ async def req_jsons(req: Request) -> Response:
     """
     global logger
     path_arg = req.rel_url.query.get('path', '')
-    logger.info('/files/results?path={path}'.format(path=str(path_arg)))
+    logger.info('/files/results?path=%s', path_arg)
 
     if path_arg == '':
         dirs_res = []
@@ -314,7 +320,7 @@ async def req_jsons(req: Request) -> Response:
     try:
         absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
     except Exception as error:
-        logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
+        logger.warning("Requested %s path didn't start with %s or %s", path_arg, results_dir, notebooks_dir, exc_info=error)
         return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}")
 
     if path_arg:
@@ -356,7 +362,7 @@ async def req_files(req: Request) -> Response:
     """
     global logger
     path_arg = req.rel_url.query.get('path', '')
-    logger.info('/files/all?path={path}'.format(path=str(path_arg)))
+    logger.info('/files/all?path=%s', path_arg)
 
     if path_arg == '':
         dirs_res = []
@@ -384,7 +390,7 @@ async def req_files(req: Request) -> Response:
     try:
         absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
     except Exception as error:
-        logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
+        logger.warning("Requested %s path didn't start with %s or %s", path_arg, results_dir, notebooks_dir, exc_info=error)
         return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}")
 
     if path_arg:
@@ -426,11 +432,11 @@ async def req_parameters(req: Request) -> Response:
     """
     global logger
     path_arg = req.rel_url.query.get('path', '')
-    logger.info('/files?path={path}'.format(path=str(path_arg)))
+    logger.info('/files?path=%s', path_arg)
     try:
         absolute_path = verify_path(path_arg, {notebooks_dir})
     except Exception as error:
-        logger.warning(f"Requested {path_arg} path didn't start with {notebooks_dir}", error)
+        logger.warning("Requested %s path didn't start with %s", path_arg, notebooks_dir, exc_info=error)
         return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {notebooks_dir}")
     if not path_arg or not os.path.isfile(absolute_path):
         return web.HTTPNotFound()
@@ -441,7 +447,7 @@ async def req_parameters(req: Request) -> Response:
 async def launch_notebook(engine_user_id: str, input_path, arguments: dict, file_name, task_metadata: TaskMetadata):
     global logger
     global tasks
-    logger.info(f'launching notebook {input_path} with {arguments}')
+    logger.info('launching notebook %s with %s', input_path, arguments)
 
     if task_metadata is None:
         return
@@ -458,7 +464,7 @@ async def launch_notebook(engine_user_id: str, input_path, arguments: dict, file
                 output_path=log_out,
                 parameters=arguments,
             )
-            logger.debug(f'successfully launched notebook {input_path}')
+            logger.debug('successfully launched notebook %s', input_path)
             task_metadata.status = TaskStatus.SUCCESS
             task_metadata.result = arguments.get('output_path')
             task_metadata.customization = arguments.get('customization_path')
@@ -467,12 +473,12 @@ async def launch_notebook(engine_user_id: str, input_path, arguments: dict, file
         task_metadata.status = TaskStatus.FAILED
         task_metadata.result = error
     except Exception as error:
-        logger.error(f'failed to launch notebook {input_path}', error)
+        logger.error('failed to launch notebook %s', input_path, exc_info=error)
         task_metadata.status = TaskStatus.FAILED
         task_metadata.result = error
     finally:
         spent_time = (datetime.now() - start_execution).total_seconds()
-        logger.info(f'ended launch notebook {input_path} with {arguments} spent_time {spent_time} sec')
+        logger.info('ended launch notebook %s with %s spent_time %d sec', input_path, arguments, spent_time)
 
 
 def verify_parameter(parameter):
@@ -484,7 +490,7 @@ def verify_parameter(parameter):
         except Exception as error:
             msg = (f"Parameter {parameter.get('name')} of type={parameter_type} with value={parameter_value} "
                    f"didn't start with {notebooks_dir} or {results_dir}")
-            logger.error(msg, error)
+            logger.error(msg, exc_info=error)
             raise Exception(msg, error)
     else:
         return parameter_value
@@ -551,14 +557,14 @@ async def req_launch(req: Request) -> Response:
     global tasks
     global logger
     path_arg = req.rel_url.query.get('path', '')
-    logger.info('/execute?path={path}'.format(path=str(path_arg)))
+    logger.info('/execute?path=%s', path_arg)
     cleanup_files()
     if not req.can_read_body:
         return web.HTTPBadRequest(reason='Body with parameters not present')
     try:
         absolute_path = verify_path(path_arg, {notebooks_dir})
     except Exception as error:
-        logger.warning(f"Requested {path_arg} path didn't start with {notebooks_dir}", error)
+        logger.warning("Requested %s path didn't start with %s", path_arg, notebooks_dir, exc_info=error)
         return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {notebooks_dir}")
     if not path_arg or not os.path.isfile(absolute_path):
         return web.HTTPNotFound()
@@ -609,7 +615,7 @@ async def req_file(req: Request) -> Response:
     global tasks
     global logger
     path_arg = req.rel_url.query.get('path', '')
-    logger.info('/file?path={path}'.format(path=str(path_arg)))
+    logger.info('/file?path=%s', path_arg)
     try:
         absolute_path = verify_path(path_arg, {results_dir, notebooks_dir})
         if not path_arg or not os.path.isfile(absolute_path):
@@ -619,10 +625,10 @@ async def req_file(req: Request) -> Response:
         file.close()
         return web.json_response({'result': content})
     except ValueError as error:
-        logger.warning(f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}", error)
+        logger.warning("Requested %s path didn't start with %s or %s", path_arg, results_dir, notebooks_dir, exc_info=error)
         return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_dir} or {notebooks_dir}")
     except Exception as error:
-        logger.warning("failed to get file", error)
+        logger.warning("failed to get file", exc_info=error)
         return web.HTTPInternalServerError(reason=str(error))
 
 
@@ -644,17 +650,17 @@ async def req_image(req: Request) -> Union[HTTPInternalServerError, FileResponse
     global tasks
     global logger
     path_arg = req.rel_url.query.get('path', '')
-    logger.info('/image?path={path}'.format(path=str(path_arg)))
+    logger.info('/image?path=%s', path_arg)
     try:
         absolute_path = verify_path(path_arg, {results_images_dir})
         if not path_arg or not os.path.isfile(absolute_path):
             return web.HTTPNotFound()
         return web.FileResponse(absolute_path)
     except ValueError as error:
-        logger.warning(f"Requested {path_arg} path didn't start with {results_images_dir} ", error)
+        logger.warning("Requested %s path didn't start with %s", path_arg, results_images_dir, exc_info=error)
         return web.HTTPNotFound(reason=f"Requested {path_arg} path didn't start with {results_images_dir}")
     except Exception as error:
-        logger.warning("failed to get image", error)
+        logger.warning('failed to get image', exc_info=error)
         return web.HTTPInternalServerError(reason=str(error))
 
 
@@ -682,7 +688,7 @@ async def req_result(req: Request) -> Response:
     global tasks
     global logger
     task_id = req.rel_url.query.get('id')
-    logger.debug('/result?id={task_id}'.format(task_id=str(task_id)))
+    logger.debug('/result?id=%s', task_id)
     task: TaskMetadata = tasks.get(task_id)
     if task is None:
         return web.HTTPNotFound(reason="Requested task doesn't exist")
@@ -712,8 +718,8 @@ async def req_result(req: Request) -> Response:
         else:
             return web.HTTPNotFound()
     finally:
-        logger.debug('/result?id={task_id}, status: {status}, duration: {duration}'
-                     .format(task_id=str(task_id), status=str(status), duration=str(datetime.now() - start)))
+        if logger.isEnabledFor(DEBUG):
+            logger.debug(f"/result?id={task_id}, status: {status}, duration: {datetime.now() - start}")
 
 
 async def req_stop(req: Request) -> Response:
@@ -733,13 +739,13 @@ async def req_stop(req: Request) -> Response:
     global tasks
     global logger
     task_id = req.rel_url.query.get('id')
-    logger.info('/stop?id={task_id}'.format(task_id=str(task_id)))
+    logger.info('/stop?id=%s', task_id)
     task: TaskMetadata = tasks.pop(task_id)
     try:
         if task and task.status == TaskStatus.IN_PROGRESS:
             task.task.cancel("stopped by user")
     except Exception as error:
-        logger.warning("failed to stop process", error)
+        logger.warning('failed to stop process', exc_info=error)
         return web.HTTPInternalServerError(reason='failed to stop process')
     return web.HTTPOk()
 

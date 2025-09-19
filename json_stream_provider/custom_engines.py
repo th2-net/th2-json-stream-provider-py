@@ -1,4 +1,4 @@
-#  Copyright 2024 Exactpro (Exactpro Systems Limited)
+#  Copyright 2024-2025 Exactpro (Exactpro Systems Limited)
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ import logging
 import time
 from datetime import datetime
 
+from nbclient.exceptions import DeadKernelError
 from papermill.clientwrap import PapermillNotebookClient
 from papermill.engines import NBClientEngine, NotebookExecutionManager, PapermillEngines
 from papermill.utils import remove_args, merge_kwargs, logger
@@ -83,7 +84,9 @@ class EngineHolder:
         return self._last_used_time
 
     def close(self):
-        self._client = None
+        if self._client is not None:
+            self._client.kc.shutdown()
+            self._client = None
 
     def _get_last_used_date_time(self):
         return datetime.fromtimestamp(self._last_used_time)
@@ -95,6 +98,7 @@ class EngineBusyError(RuntimeError):
 
 class CustomEngine(NBClientEngine):
     out_of_use_engine_time: int = 60 * 60
+    restart_kernel_on_error: bool = False
     metadata_dict: dict = {}
     logger: logging.Logger
 
@@ -215,11 +219,27 @@ class CustomEngine(NBClientEngine):
                 stdout_file=stdout_file,
                 stderr_file=stderr_file,
             )
-            cls.logger.info(f"Created papermill notebook client for {key}")
+            cls.logger.info('Created papermill notebook client for %s', key)
             return PapermillNotebookClient(nb_man, **final_kwargs)
 
         engine_holder: EngineHolder = cls.get_or_create_engine_metadata(key, create_client)
-        return await engine_holder.async_execute(nb_man)
+        try:
+            return await engine_holder.async_execute(nb_man)
+        except DeadKernelError as error:
+            cls.logger.error('Client related to %s is died', key, exc_info=error)
+            cls.remove_engine(key)
+            raise error
+        except RuntimeError as error:
+            if str(error).startswith("Kernel didn't respond in"):
+                cls.logger.error("Client related to %s doesn't respond", key, exc_info=error)
+                cls.remove_engine(key)
+            raise error
+        except Exception as error:
+            if cls.restart_kernel_on_error:
+                cls.logger.error("Client related to %s catches error", key, exc_info=error)
+                cls.remove_engine(key)
+            raise error
+
 
     @classmethod
     def create_logger(cls):
@@ -228,6 +248,10 @@ class CustomEngine(NBClientEngine):
     @classmethod
     def set_out_of_use_engine_time(cls, value: int):
         cls.out_of_use_engine_time = value
+
+    @classmethod
+    def set_restart_kernel_on_error(cls, value: bool):
+        cls.restart_kernel_on_error = value
 
     @classmethod
     def get_or_create_engine_metadata(cls, key: EngineKey, func):
@@ -241,6 +265,13 @@ class CustomEngine(NBClientEngine):
         return engine_holder
 
     @classmethod
+    def remove_engine(cls, key: EngineKey):
+        engine_holder: EngineHolder = cls.metadata_dict.pop(key)
+        if engine_holder is not None:
+            engine_holder.close()
+            cls.logger.info("unregistered '%s' papermill engine", key)
+
+    @classmethod
     def remove_out_of_date_engines(cls, exclude_key: EngineKey):
         now = time.time()
         dead_line = now - cls.out_of_use_engine_time
@@ -249,8 +280,10 @@ class CustomEngine(NBClientEngine):
         for key in out_of_use_engines:
             engine_holder: EngineHolder = cls.metadata_dict.pop(key)
             engine_holder.close()
-            cls.logger.info(
-                f"unregistered '{key}' papermill engine, last used time {now - engine_holder.get_last_used_time()} sec ago")
+            if cls.logger.isEnabledFor(logging.INFO):
+                cls.logger.info(
+                    f"unregistered '{key}' papermill engine, last used time "
+                    f"{now - engine_holder.get_last_used_time()} sec ago")
 
 
 class CustomEngines(PapermillEngines):
