@@ -124,6 +124,7 @@ def read_config(path: str):
         if log_dir:
             create_dir(log_dir)
 
+        CustomEngine.set_out_of_use_engine_time(cfg.get('restart-kernel-on-error', CustomEngine.restart_kernel_on_error))
         CustomEngine.set_out_of_use_engine_time(cfg.get('out-of-use-engine-time', CustomEngine.out_of_use_engine_time))
     except Exception as e:
         logger.error("Read '%s' configuration failure", path, exc_info=e)

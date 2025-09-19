@@ -11,6 +11,7 @@ This python server is made to launch Jupyter notebooks (*.ipynb) and get results
 * `results-images` (Default value: /home/jovyan/j-sp/results/images) - path to the directory for images prepared during notebook run. `j-sp` provides `/image?path=<full path to image>` endpoint for getting stored images.
 * `logs` (Default value: /home/jupyter-notebook/logs) - path to the directory for run logs. `j-sp` puts run logs to specified folder.
 * `out-of-use-engine-time` (Default value: 3600) - out-of-use time interval in seconds. `j-sp` unregisters engine related to a notebook when user doesn't run the notebook more than this time
+* `restart-kernel-on-error` (Default value: False) - if True `j-sp` restart Kernel when executed notebook raises `RuntimeError` otherwise in special cases: `DeadKernelError` and etc. 
 
 ### mounting:
 
@@ -41,6 +42,7 @@ spec:
     results-images: /home/jovyan/j-sp/results/images
     logs: /home/jupyter-notebook/j-sp/logs/
     out-of-use-engine-time: 3600
+    restart-kernel-on-error: false
   loggingConfig: |
     [loggers]
     keys=root,jsp,aiohttp_access
@@ -254,6 +256,7 @@ docker compose build
 ### 0.0.9
 
 * fixed [GH-21: json-stream-provider doesn't restart Python Kernel automatically](https://github.com/th2-net/th2-json-stream-provider-py/issues/21)
+* added `restart-kernel-on-error` option to custom settings
 
 ### 0.0.8
 

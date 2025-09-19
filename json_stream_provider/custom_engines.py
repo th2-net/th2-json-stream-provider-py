@@ -102,6 +102,7 @@ class EngineBusyError(RuntimeError):
 
 class CustomEngine(NBClientEngine):
     out_of_use_engine_time: int = 60 * 60
+    restart_kernel_on_error: bool = False
     metadata_dict: dict = {}
     logger: logging.Logger
 
@@ -233,7 +234,10 @@ class CustomEngine(NBClientEngine):
             cls.restart_engine(key)
             raise error
         except RuntimeError as error:
-            if str(error).startswith("Kernel didn't respond in"):
+            if cls.restart_kernel_on_error:
+                cls.logger.error("Client related to %s catches error", key, exc_info=error)
+                cls.restart_engine(key)
+            elif str(error).startswith("Kernel didn't respond in"):
                 cls.logger.error("Client related to %s doesn't respond", key, exc_info=error)
                 cls.restart_engine(key)
             raise error
@@ -246,6 +250,10 @@ class CustomEngine(NBClientEngine):
     @classmethod
     def set_out_of_use_engine_time(cls, value: int):
         cls.out_of_use_engine_time = value
+
+    @classmethod
+    def set_restart_kernel_on_error(cls, value: bool):
+        cls.restart_kernel_on_error = value
 
     @classmethod
     def get_or_create_engine_metadata(cls, key: EngineKey, func):
