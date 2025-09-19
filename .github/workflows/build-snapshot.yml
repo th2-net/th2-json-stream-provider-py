@@ -83,7 +83,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: '.'
-          push: ${{ github.event.pull_request.user.login != 'dependabot[bot]' }}
+          push: ${{ github.actor != 'dependabot[bot]' }}
           tags: ghcr.io/${{ github.repository }}:${{ needs.get-version.outputs.version }}
           labels: com.exactpro.th2.${{ github.repository }}=${{ needs.get-version.outputs.versionNumber }}
           provenance: false
