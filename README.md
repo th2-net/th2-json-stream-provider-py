@@ -11,7 +11,10 @@ This python server is made to launch Jupyter notebooks (*.ipynb) and get results
 * `results-images` (Default value: /home/jovyan/j-sp/results/images) - path to the directory for images prepared during notebook run. `j-sp` provides `/image?path=<full path to image>` endpoint for getting stored images.
 * `logs` (Default value: /home/jupyter-notebook/logs) - path to the directory for run logs. `j-sp` puts run logs to specified folder.
 * `out-of-use-engine-time` (Default value: 3600) - out-of-use time interval in seconds. `j-sp` unregisters engine related to a notebook when user doesn't run the notebook more than this time
-* `restart-kernel-on-error` (Default value: False) - if True `j-sp` restart Kernel when executed notebook raises `Exception` otherwise in special cases: `DeadKernelError` and etc. 
+* `restart-kernel-on-error` (Default value: False) - if True `j-sp` restart Kernel when executed notebook raises `Exception` otherwise in special cases: `DeadKernelError`, etc.
+* `cleanup-horizon-days` (Default value: 14) - `j-sp` recursively removes files older this day's number from `results`, `results-images`, `logs` directories.
+  * zero value - all files from the directories are removed before each notebook executed.
+  * negative value - disabled the cleanup functionality.
 
 ### mounting:
 
@@ -43,6 +46,7 @@ spec:
     logs: /home/jupyter-notebook/j-sp/logs/
     out-of-use-engine-time: 3600
     restart-kernel-on-error: false
+    cleanup-horizon-days: 14
   loggingConfig: |
     [loggers]
     keys=root,jsp,aiohttp_access
@@ -257,6 +261,7 @@ docker compose build
 
 * fixed [GH-21: json-stream-provider doesn't restart Python Kernel automatically](https://github.com/th2-net/th2-json-stream-provider-py/issues/21)
 * added `restart-kernel-on-error` option to custom settings
+* added `cleanup-horizon-days` option to custom settings
 
 ### 0.0.8
 
