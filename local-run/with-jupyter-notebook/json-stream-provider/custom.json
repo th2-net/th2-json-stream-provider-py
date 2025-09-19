@@ -3,5 +3,6 @@
   "results": "/home/jovyan/j-sp/results",
   "results-images": "/home/jovyan/j-sp/results/images",
   "logs": "/home/jovyan/j-sp/logs",
-  "out-of-use-engine-time": 3600
+  "out-of-use-engine-time": 3600,
+  "cleanup-horizon-days": -1
 }
