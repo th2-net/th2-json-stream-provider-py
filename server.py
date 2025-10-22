@@ -43,6 +43,7 @@ from json_stream_provider.custom_python_translator import CustomPythonTranslator
 from json_stream_provider.error_utils import prepare_response_error
 from json_stream_provider.log_configuratior import configure_logging
 from json_stream_provider.papermill_execute_ext import DEFAULT_ENGINE_USER_ID
+from json_stream_provider.virtual_environment import register_kernel
 
 ENGINE_USER_ID_COOKIE_KEY = 'engine_user_id'
 
@@ -54,6 +55,8 @@ results_dir: str = '/home/jupyter-notebook/results/'
 results_images_dir: str = '/home/jupyter-notebook/results/images/'
 log_dir: str = '/home/jupyter-notebook/logs/'
 cleanup_horizon: timedelta = timedelta(weeks=2)
+venv_dir: str = '/home/json-stream/.venv'
+kernel_name: str = '.venv'
 
 tasks: dict = {}
 
@@ -102,6 +105,8 @@ def read_config(path: str):
     global results_dir
     global log_dir
     global cleanup_horizon
+    global venv_dir
+    global kernel_name
     global logger
     try:
         file = open(path, "r")
@@ -135,11 +140,22 @@ def read_config(path: str):
         out_of_use_engine_time = cfg.get('out-of-use-engine-time', CustomEngine.out_of_use_engine_time)
         logger.info('out-of-use-engine-time=%s', out_of_use_engine_time)
 
+        venv_dir = cfg.get('virtual-environment-dir', venv_dir)
+        logger.info('virtual-environment-dir=%s', venv_dir)
+
+        kernel_name = cfg.get('python-kernel-name', kernel_name)
+        logger.info('python-kernel-name=%s', kernel_name)
+
         CustomEngine.set_restart_kernel_on_error(restart_kernel_on_error)
         CustomEngine.set_out_of_use_engine_time(out_of_use_engine_time)
     except Exception as e:
         logger.error("Read '%s' configuration failure", path, exc_info=e)
-
+        raise e
+    try:
+        register_kernel(venv_dir=Path(venv_dir), kernel_name=kernel_name, kernel_display_name=kernel_name)
+    except Exception as e:
+        logger.error("register kernel failure", exc_info=e)
+        raise e
 
 def get_or_default_engine_user_id(req: Request) -> str:
     return req.cookies.get(ENGINE_USER_ID_COOKIE_KEY, DEFAULT_ENGINE_USER_ID)
@@ -447,6 +463,7 @@ async def req_parameters(req: Request) -> Response:
 async def launch_notebook(engine_user_id: str, input_path, arguments: dict, file_name, task_metadata: TaskMetadata):
     global logger
     global tasks
+    global kernel_name
     logger.info('launching notebook %s with %s', input_path, arguments)
 
     if task_metadata is None:
@@ -463,6 +480,7 @@ async def launch_notebook(engine_user_id: str, input_path, arguments: dict, file
                 input_path=input_path,
                 output_path=log_out,
                 parameters=arguments,
+                kernel_name=kernel_name,
             )
             logger.debug('successfully launched notebook %s', input_path)
             task_metadata.status = TaskStatus.SUCCESS

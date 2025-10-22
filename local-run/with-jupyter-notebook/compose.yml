@@ -6,10 +6,9 @@ services:
     ports:
       - "8081:8080"
     volumes:
-      - j_sp_volume:/home/json-stream/:rw
-      - jupyter_volume:/home/jovyan/:rw
-      - python_lib:/home/json-stream/python/lib:ro
-      - ${USER_DATA_DIR}:/home/jovyan/user-data/:rw
+      - j_sp_volume:/home/json-stream/j-sp:rw
+      - python_venv:/home/json-stream/.venv:ro
+      - ${USER_DATA_DIR}:/home/jovyan/user-data:rw
       - ./json-stream-provider:/var/th2/config:ro
     networks:
       - th2_network
@@ -21,8 +20,8 @@ services:
     ports:
       - "8082:8888"
     volumes:
-      - jupyter_volume:/home/jovyan/:rw
-      - python_lib:/home/jovyan/python/lib:rw
+      - j_sp_volume:/home/jovyan/j-sp:ro
+      - python_venv:/home/jovyan/.venv:rw
       - ${USER_DATA_DIR}:/home/jovyan/user-data/:rw
     networks:
       - th2_network
@@ -46,9 +45,8 @@ services:
       - th2_network
 
 volumes:
-  jupyter_volume:
+  python_venv:
   j_sp_volume:
-  python_lib:
 
 networks:
   th2_network:

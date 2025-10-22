@@ -1,4 +1,4 @@
-# th2-json-stream-provider (j-sp) (0.0.9)
+# th2-json-stream-provider (j-sp) (0.1.0)
 
 This python server is made to launch Jupyter notebooks (*.ipynb) and get results from them.
 
@@ -15,6 +15,9 @@ This python server is made to launch Jupyter notebooks (*.ipynb) and get results
 * `cleanup-horizon-days` (Default value: 14) - `j-sp` recursively removes files older this day's number from `results`, `results-images`, `logs` directories.
   * zero value - all files from the directories are removed before each notebook executed.
   * negative value - disabled the cleanup functionality.
+* `virtual-environment-dir` (Default value: /home/json-stream/.venv) - `j-sp` creates python virtual environment from this folder or reuse virtual environment if folder already exists.
+  Please note: `j-sp` docker image creates `/opt/conda/bin/python` and `/opt/conda/bin/pip` links to mimics environment of `jupter/datascience-notebook` docker image  
+* `python-kernel-name` (Default value: .venv) - `j-sp` isntall ipykernel with this name using virtual environment specified in `virtual-environment-dir`
 
 ### mounting:
 
@@ -47,6 +50,8 @@ spec:
     out-of-use-engine-time: 3600
     restart-kernel-on-error: false
     cleanup-horizon-days: 14
+    virtual-environment-dir: /home/json-stream/.venv
+    python-kernel-name: .venv
   loggingConfig: |
     [loggers]
     keys=root,jsp,aiohttp_access
@@ -256,6 +261,9 @@ docker compose build
   ```
 
 ## Release notes:
+
+### 0.1.0
+* migrated to python virtual environment.
 
 ### 0.0.9
 
