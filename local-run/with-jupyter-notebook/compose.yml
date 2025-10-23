@@ -1,33 +1,35 @@
 services:
   json_stream_provider:
+    container_name: json_stream_provider
     build:
       context: ../../
       dockerfile: Dockerfile
     ports:
       - "8081:8080"
     volumes:
-      - j_sp_volume:/home/json-stream/:rw
-      - jupyter_volume:/home/jovyan/:rw
-      - python_lib:/home/json-stream/python/lib:ro
-      - ${USER_DATA_DIR}:/home/jovyan/user-data/:rw
+      - j_sp_volume:/home/json-stream/j-sp:rw
+      - python_venv:/home/json-stream/.venv:ro
+      - ${USER_DATA_DIR}:/home/jovyan/user-data:rw
       - ./json-stream-provider:/var/th2/config:ro
     networks:
       - th2_network
 
   jupyter_notebook:
+    container_name: jupyter_notebook
     build:
       context: ./jupyter-notebook
       dockerfile: Dockerfile
     ports:
       - "8082:8888"
     volumes:
-      - jupyter_volume:/home/jovyan/:rw
-      - python_lib:/home/jovyan/python/lib:rw
+      - j_sp_volume:/home/jovyan/j-sp:ro
+      - python_venv:/home/jovyan/.venv:rw
       - ${USER_DATA_DIR}:/home/jovyan/user-data/:rw
     networks:
       - th2_network
 
   th2_rpt_viewer:
+    container_name: th2_rpt_viewer
     image: ghcr.io/th2-net/th2-rpt-viewer:5.2.12
     ports:
       - "8083:8080"
@@ -37,18 +39,18 @@ services:
       - th2_network
 
   nginx_reverse_proxy:
+    container_name: nginx_reverse_proxy
     image: nginx
     ports:
-      - "80:80"
+      - "8080:8080"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
       - th2_network
 
 volumes:
-  jupyter_volume:
+  python_venv:
   j_sp_volume:
-  python_lib:
 
 networks:
   th2_network:

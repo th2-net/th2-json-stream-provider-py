@@ -1,8 +1,10 @@
 {
-  "notebooks": "/home/jovyan",
-  "results": "/home/jovyan/j-sp/results",
-  "results-images": "/home/jovyan/j-sp/results/images",
-  "logs": "/home/jovyan/j-sp/logs",
+  "notebooks": "/home/jovyan/user-data",
+  "results": "/home/json-stream/j-sp/results",
+  "results-images": "/home/json-stream/j-sp/results/images",
+  "logs": "/home/json-stream/j-sp/logs",
   "out-of-use-engine-time": 3600,
-  "cleanup-horizon-days": -1
+  "cleanup-horizon-days": -1,
+  "python-kernel-name": ".venv",
+  "virtual-environment-dir": "/home/json-stream/.venv"
 }

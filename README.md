@@ -1,4 +1,4 @@
-# th2-json-stream-provider (j-sp) (0.0.9)
+# th2-json-stream-provider (j-sp) (0.1.0)
 
 This python server is made to launch Jupyter notebooks (*.ipynb) and get results from them.
 
@@ -15,6 +15,9 @@ This python server is made to launch Jupyter notebooks (*.ipynb) and get results
 * `cleanup-horizon-days` (Default value: 14) - `j-sp` recursively removes files older this day's number from `results`, `results-images`, `logs` directories.
   * zero value - all files from the directories are removed before each notebook executed.
   * negative value - disabled the cleanup functionality.
+* `virtual-environment-dir` (Default value: /home/json-stream/.venv) - `j-sp` creates python virtual environment from this folder or reuse virtual environment if folder already exists.
+  Please note: `j-sp` docker image creates `/opt/conda/bin/python` and `/opt/conda/bin/pip` links to mimics environment of `jupter/datascience-notebook` docker image  
+* `python-kernel-name` (Default value: .venv) - `j-sp` isntall ipykernel with this name using virtual environment specified in `virtual-environment-dir`
 
 ### mounting:
 
@@ -47,6 +50,8 @@ spec:
     out-of-use-engine-time: 3600
     restart-kernel-on-error: false
     cleanup-horizon-days: 14
+    virtual-environment-dir: /home/json-stream/.venv
+    python-kernel-name: .venv
   loggingConfig: |
     [loggers]
     keys=root,jsp,aiohttp_access
@@ -235,27 +240,61 @@ chgrp -R users user_data/
 chmod -R g=u user_data/
 ```
 
-#### start command
-```shell
-cd local-run/with-jupyter-notebook
-docker compose up --build
-```
-#### clean command
-```shell
-cd local-run/with-jupyter-notebook
-docker compose rm --force --volumes --stop
-docker compose down --volumes
-docker compose build
-```
-#### application URLs:
-* http://localhost - th2-rpt-viewer
-* http://localhost/jupyter - jupyter-notebook. You can authorise via token printed into `jupyter_notebook` logs:
+#### if you use docker
+* ##### start command
   ```shell
-  cd local-run/with-jupyter-notebook
-  docker compose logs jupyter_notebook | grep 'jupyter/lab?token=' | tail -1 | cut -d '=' -f 2
+  cd local-run/with-docker
+  docker compose up --build
+  ```
+* ##### clean command
+  ```shell
+  cd local-run/with-docker
+  docker compose rm --force --volumes --stop
+  docker compose down --volumes
+  docker compose build
   ```
 
+#### if you use podman
+* ##### start command
+  ```shell
+  cd local-run/with-jupyter-notebook
+  docker-compose up
+  ```
+* ##### rebuild command
+  ```shell
+  cd local-run/with-jupyter-notebook
+  docker-compose build
+  ```
+* ##### clean command
+  ```shell
+  cd local-run/with-jupyter-notebook
+  docker-compose rm --force --volumes --stop
+  docker-compose down --volumes
+  docker-compose build
+  ```
+#### application URLs:
+* http://localhost:8080 - th2-rpt-viewer
+* http://localhost:8082 - jupyter-notebook. 
+  You can authorise via token printed into `jupyter_notebook` logs:
+  * if you use docker
+    ```shell
+    cd local-run/with-jupyter-notebook
+    docker compose logs jupyter_notebook | grep '/lab?token=' | tail -1 | cut -d '=' -f 2
+    ```
+  * if you use podman
+    ```shell
+    cd local-run/with-docker
+    docker-compose logs jupyter_notebook | grep '/lab?token=' | tail -1 | cut -d '=' -f 2
+    ```
+
 ## Release notes:
+
+### 0.1.0
+* implemented [GH-29: Use Python virtual environment instead of PIP_TARGET](https://github.com/th2-net/th2-json-stream-provider-py/issues/29)
+* changed local run with jupyter-notebook:
+  * [application urls](#application-urls) were changed.
+  * Migration from earlier versions:
+    * Execute [clean command](#clean-command) because `jupyter-notebook` prepare `.venv` witch should be shared to `json-stream-provider` 
 
 ### 0.0.9
 

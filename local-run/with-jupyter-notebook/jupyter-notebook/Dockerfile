@@ -2,9 +2,6 @@ FROM jupyter/datascience-notebook:python-3.9
 
 RUN echo "c.ServerApp.base_url = '/jupyter/'" >> /etc/jupyter/jupyter_server_config.py
 
-ENV PYTHON_SHARED_LIB_PATH="${HOME}/python/lib"
-ENV PYTHONPATH="${PYTHONPATH}:${PYTHON_SHARED_LIB_PATH}"
-ENV PIP_TARGET="${PYTHON_SHARED_LIB_PATH}"
-
-RUN mkdir -p "${PYTHON_SHARED_LIB_PATH}"
-RUN echo 'umask 0007' >> "${HOME}/.bashrc"
+RUN python -m venv /home/jovyan/.venv
+RUN source /home/jovyan/.venv/bin/activate && pip install --upgrade pip && pip install ipykernel && python -m ipykernel install --user --name=.venv --display-name 'Python (.venv)'
+RUN cat /home/jovyan/.local/share/jupyter/kernels/.venv/kernel.json
