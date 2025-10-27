@@ -49,6 +49,7 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v6
         with:
+          platforms: linux/amd64,linux/arm64
           context: '.'
           push: true
           tags: ghcr.io/${{ github.repository }}:${{ needs.get-version.outputs.version }}

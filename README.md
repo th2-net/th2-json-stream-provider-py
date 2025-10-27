@@ -1,4 +1,4 @@
-# th2-json-stream-provider (j-sp) (0.1.0)
+# th2-json-stream-provider (j-sp) (0.1.1)
 
 This python server is made to launch Jupyter notebooks (*.ipynb) and get results from them.
 
@@ -288,6 +288,10 @@ chmod -R g=u user_data/
     ```
 
 ## Release notes:
+
+### 0.1.1
+
+* [[GH-31] Built multi-architecture image: linux/amd64, linux/arm64](https://github.com/th2-net/th2-json-stream-provider-py/issues/31)
 
 ### 0.1.0
 * implemented [GH-29: Use Python virtual environment instead of PIP_TARGET](https://github.com/th2-net/th2-json-stream-provider-py/issues/29)
