@@ -6,26 +6,16 @@ WORKDIR /app
 # Copy requirements.txt into the container at /app
 COPY requirements.txt /app/
 
-
-# groupadd --system - create a system account
-# useradd --system - create a system account
-# useradd --gid - name or ID of the primary group of the new account
-RUN useradd --system --gid users --uid 1000 json-stream
-
 ENV HOME="/home/json-stream"
 RUN mkdir -p "${HOME}"
 
 # Install any needed dependencies specified in requirements.txt
 RUN pip install -r requirements.txt
 
-RUN chown -R json-stream "${HOME}" && chmod -R g=u "${HOME}"
-
 # create sim links for compatible to jupyter python
 RUN mkdir -p /opt/conda/bin && \
     ln -s /usr/local/bin/python /opt/conda/bin/python && \
     ln -s /usr/local/bin/pip /opt/conda/bin/pip
-
-USER json-stream
 
 ENV HOME="/home/json-stream"
 RUN echo 'umask 0007' >> "${HOME}/.bashrc"

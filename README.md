@@ -1,4 +1,4 @@
-# th2-json-stream-provider (j-sp) (0.1.1)
+# th2-json-stream-provider (j-sp) (0.1.2)
 
 This python server is made to launch Jupyter notebooks (*.ipynb) and get results from them.
 
@@ -288,6 +288,11 @@ chmod -R g=u user_data/
     ```
 
 ## Release notes:
+
+### 0.1.2
+
+* avoided `json-stream` user creation in Dockerfile 
+* updated: aiohttp~=3.13.2
 
 ### 0.1.1
 
