@@ -1,4 +1,4 @@
-# th2-json-stream-provider (j-sp) (0.1.2)
+# th2-json-stream-provider (j-sp) (0.2.0)
 
 This python server is made to launch Jupyter notebooks (*.ipynb) and get results from them.
 
@@ -258,7 +258,7 @@ chmod -R g=u user_data/
 * ##### start command
   ```shell
   cd local-run/with-jupyter-notebook
-  docker-compose up
+  docker-compose up --build
   ```
 * ##### rebuild command
   ```shell
@@ -288,6 +288,12 @@ chmod -R g=u user_data/
     ```
 
 ## Release notes:
+
+### 0.2.0
+
+* updated: python-3.12.9
+* changed local run with jupyter-notebook:
+  * used jupyterhub/singleuser:5.2.1
 
 ### 0.1.2
 
