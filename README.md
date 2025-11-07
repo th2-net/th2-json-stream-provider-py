@@ -258,7 +258,7 @@ chmod -R g=u user_data/
 * ##### start command
   ```shell
   cd local-run/with-jupyter-notebook
-  docker-compose up
+  docker-compose up --build
   ```
 * ##### rebuild command
   ```shell
