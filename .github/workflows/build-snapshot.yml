@@ -61,7 +61,7 @@ jobs:
     uses: th2-net/.github/.github/workflows/python-license-check.yml@main
     with:
       version: ${{ needs.get-version.outputs.version }}
-      python-version: 3.9
+      python-version: 3.12
 
   docker-push:
     runs-on: ubuntu-latest
