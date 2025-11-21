@@ -9,7 +9,7 @@ jobs:
   get-git-branch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Get branch name
         id: branch
         run: echo "branch_name=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
@@ -20,7 +20,7 @@ jobs:
   get-commit-hash:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Get SHA of the commit
         id: sha
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ get-git-branch, get-commit-hash ]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Get package version
         id: pack_ver
         uses: notiz-dev/github-action-json-property@release
