@@ -3,5 +3,5 @@ aiohttp-swagger~=1.0.16
 aiojobs~=1.4.0
 ipykernel~=7.1.0
 papermill~=2.6.0
-nbclient~=0.10.3
+nbclient~=0.10.4
 nbformat~=5.10.4
