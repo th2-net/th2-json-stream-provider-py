@@ -222,12 +222,21 @@ pytest
 The default suite needs neither `j-sp` nor Jupyter installed, so `requirements-dev.txt` stays
 light on purpose.
 
-There is also an end to end suite that starts the real solution, runs `example.ipynb` through the
-viewer's proxy and reads its results back through Jupyter. It needs the full requirements and the
-extracted viewer, so it is opt-in and skips itself when either is missing:
+Two further suites are opt-in, because they need more than the sources.
+
+`-m integration` starts the real solution, runs `example.ipynb` through the viewer's proxy and
+reads its results back through Jupyter. It needs the full requirements and the extracted viewer,
+and skips itself when either is missing. It also runs inside an unpacked distributive, which makes
+it a quick way to confirm a deployment.
+
+`-m docker` extracts the real th2-rpt-viewer image rather than a stubbed one. It is the only check
+that would notice a new viewer version moving its document root, dropping the configuration
+symlink, or renaming the `json-stream-provider/...` URL the proxy is built around. It needs podman
+or docker and skips itself when neither is available.
 
 ```bash
 pytest -m integration
+pytest -m docker
 ```
 
 ## Requirements
