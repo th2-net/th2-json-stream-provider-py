@@ -57,6 +57,7 @@ log_dir: str = '/home/jupyter-notebook/logs/'
 cleanup_horizon: timedelta = timedelta(weeks=2)
 venv_dir: str = '/home/json-stream/.venv'
 kernel_name: str = '.venv'
+port: int = 8080
 
 tasks: dict = {}
 
@@ -107,6 +108,7 @@ def read_config(path: str):
     global cleanup_horizon
     global venv_dir
     global kernel_name
+    global port
     global logger
     try:
         file = open(path, "r")
@@ -145,6 +147,9 @@ def read_config(path: str):
 
         kernel_name = cfg.get('python-kernel-name', kernel_name)
         logger.info('python-kernel-name=%s', kernel_name)
+
+        port = cfg.get('port', port)
+        logger.info('port=%s', port)
 
         CustomEngine.set_restart_kernel_on_error(restart_kernel_on_error)
         CustomEngine.set_out_of_use_engine_time(out_of_use_engine_time)
@@ -792,4 +797,4 @@ if __name__ == '__main__':
     app.router.add_route('POST', "/stop", req_stop)
     setup_swagger(app)
     logger.info('starting server')
-    web.run_app(app)
+    web.run_app(app, port=port)

@@ -18,6 +18,7 @@ This python server is made to launch Jupyter notebooks (*.ipynb) and get results
 * `virtual-environment-dir` (Default value: /home/json-stream/.venv) - `j-sp` creates python virtual environment from this folder or reuse virtual environment if folder already exists.
   Please note: `j-sp` docker image creates `/opt/conda/bin/python` and `/opt/conda/bin/pip` links to mimics environment of `jupter/datascience-notebook` docker image  
 * `python-kernel-name` (Default value: .venv) - `j-sp` isntall ipykernel with this name using virtual environment specified in `virtual-environment-dir`
+* `port` (Default value: 8080) - TCP port `j-sp` listens on. The default matches the `clusterIP` container port used in th2 deployments, so it should be changed only when `j-sp` runs outside of a container and the default port is already taken.
 
 ### mounting:
 
