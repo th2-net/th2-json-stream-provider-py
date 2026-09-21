@@ -12,6 +12,7 @@ docker image, so its JS static has to be extracted from there. Nothing at run ti
 | Path | Description |
 | --- | --- |
 | `run_solution.py` | configures and launches the whole solution |
+| `build_distributive.py` | packs the solution into a portable archive |
 | `config.yaml` | configuration of `run_solution.py` |
 | `prepare_viewer.py` | extracts the th2-rpt-viewer JS static out of its docker image |
 | `serve_static.py` | serves the viewer and proxies its API calls to th2-json-stream-provider |
@@ -19,6 +20,7 @@ docker image, so its JS static has to be extracted from there. Nothing at run ti
 | `json-stream-provider/log4py.conf` | provider logging configuration |
 | `th2-rpt-viewer/static/` | the extracted viewer, produced by `prepare_viewer.py` (git-ignored) |
 | `requirements.txt` | dependencies of the solution |
+| `dist/` | built archives, produced by `build_distributive.py` (git-ignored) |
 | `tests/` | pytest suite for the scripts of this directory |
 | `requirements-dev.txt` | dependencies for running the tests |
 | `workspace/` | notebooks, results and logs, created on the first start (git-ignored) |
@@ -124,6 +126,59 @@ configuration.
 
 * An empty `jupyter.token` disables Jupyter authentication. That is acceptable while bound to
   `127.0.0.1`, but set a token before changing `host`.
+
+## `build_distributive.py`
+
+Packs everything into a portable archive: the provider, the extracted viewer, the launcher, the
+configuration and the tests. Unpack it anywhere, install the requirements and run it — the paths
+in `config.yaml` are relative to the configuration file, and `run_solution.py` finds `server.py`
+next to itself.
+
+```bash
+python3 build_distributive.py                 # ./dist/th2-json-stream-provider-local-run-<version>.tar.gz
+python3 build_distributive.py --with-wheels   # adds an offline install
+python3 build_distributive.py --zip           # also builds a .zip
+```
+
+It extracts the viewer first when it is missing, so a clean checkout needs only this one command.
+The `-r` include of `requirements.txt` is inlined on the way in, because a distributive has no
+directory above it. The version comes from `package_info.json`.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--output` | `./dist` | directory to write the archive into |
+| `--version` | `package_info.json` | version of the distributive |
+| `--with-wheels` | off | include a wheelhouse for installing without a network |
+| `--zip` | off | also build a `.zip` archive |
+| `--skip-viewer` | off | fail instead of extracting the viewer when it is missing |
+| `--runtime` | autodetected | container runtime for extracting the viewer |
+
+### Using a distributive
+
+```bash
+tar -xzf th2-json-stream-provider-local-run-<version>.tar.gz
+cd th2-json-stream-provider-local-run-<version>
+pip install -r requirements.txt
+python3 run_solution.py
+```
+
+`pytest -m integration` inside the unpacked directory starts the solution, runs the bundled
+`example.ipynb` through the viewer and checks the results, which is a quick way to confirm the
+deployment works.
+
+### Offline installs
+
+`--with-wheels` adds a `wheelhouse/` of every dependency, roughly 50 MB, installed with:
+
+```bash
+pip install --no-index --find-links wheelhouse -r requirements.txt
+python3 run_solution.py --wheelhouse wheelhouse
+```
+
+The wheels are built for the python version and the platform that produced them — installing them
+on a different python minor version fails with `No matching distribution found`, because the
+compiled wheels carry a `cpXY` tag. `wheelhouse/BUILT-FOR.txt` records the target; build the
+distributive on an interpreter matching the machines it is meant for.
 
 ## `serve_static.py`
 

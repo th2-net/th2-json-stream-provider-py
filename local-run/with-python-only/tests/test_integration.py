@@ -37,8 +37,17 @@ import requests
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = SCRIPTS_DIR.parent.parent
 VIEWER_STATIC = SCRIPTS_DIR / 'th2-rpt-viewer' / 'static'
-EXAMPLE_NOTEBOOK = REPO_ROOT / 'example' / 'example.ipynb'
 LOG4PY_CONF = SCRIPTS_DIR / 'json-stream-provider' / 'log4py.conf'
+
+
+def _alongside_or_in_repository(*relative) -> Path:
+    """A distributive is flat, a checkout keeps the provider two directories up."""
+    candidates = (SCRIPTS_DIR.joinpath(*relative), REPO_ROOT.joinpath(*relative))
+    return next((path for path in candidates if path.exists()), candidates[0])
+
+
+SERVER_SCRIPT = _alongside_or_in_repository('server.py')
+EXAMPLE_NOTEBOOK = _alongside_or_in_repository('example', 'example.ipynb')
 SHARED_KERNEL_VENV = SCRIPTS_DIR / 'kernel-venv'
 
 pytestmark = pytest.mark.integration
@@ -76,6 +85,8 @@ def missing_requirement() -> str:
         return f'{VIEWER_STATIC} is missing, run prepare_viewer.py first'
     if not EXAMPLE_NOTEBOOK.is_file():
         return f'{EXAMPLE_NOTEBOOK} is missing'
+    if not SERVER_SCRIPT.is_file():
+        return f'{SERVER_SCRIPT} is missing'
     return ''
 
 
@@ -129,7 +140,7 @@ def solution(tmp_path_factory):
                    'config': str(SCRIPTS_DIR / 'th2-rpt-viewer' / 'custom.json')},
         'kernel': {'venv': str(kernel_venv)},
         'jupyter': {'data-dir': str(tmp_path / 'jupyter-data')},
-        'json-stream-provider': {'script': str(REPO_ROOT / 'server.py'),
+        'json-stream-provider': {'script': str(SERVER_SCRIPT),
                                  'log-config': str(LOG4PY_CONF)},
         'runtime-dir': str(tmp_path / 'runtime'),
     }
@@ -268,7 +279,7 @@ def test_shuts_everything_down_on_interrupt(tmp_path_factory):
                    'config': str(SCRIPTS_DIR / 'th2-rpt-viewer' / 'custom.json')},
         'kernel': {'venv': str(kernel_venv)},
         'jupyter': {'data-dir': str(tmp_path / 'jupyter-data')},
-        'json-stream-provider': {'script': str(REPO_ROOT / 'server.py'),
+        'json-stream-provider': {'script': str(SERVER_SCRIPT),
                                  'log-config': str(LOG4PY_CONF)},
         'runtime-dir': str(tmp_path / 'runtime'),
     }))
