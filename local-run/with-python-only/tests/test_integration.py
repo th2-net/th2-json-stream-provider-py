@@ -38,12 +38,26 @@ SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = SCRIPTS_DIR.parent.parent
 VIEWER_STATIC = SCRIPTS_DIR / 'th2-rpt-viewer' / 'static'
 EXAMPLE_NOTEBOOK = REPO_ROOT / 'example' / 'example.ipynb'
+LOG4PY_CONF = SCRIPTS_DIR / 'json-stream-provider' / 'log4py.conf'
 SHARED_KERNEL_VENV = SCRIPTS_DIR / 'kernel-venv'
 
 pytestmark = pytest.mark.integration
 
 STARTUP_TIMEOUT = 180
 RUN_TIMEOUT = 120
+
+
+def _non_loopback_address() -> str:
+    """An address of this machine other than 127.0.0.1, or skips when there is none."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        try:
+            sock.connect(('192.0.2.1', 9))  # TEST-NET-1, no traffic leaves the machine
+            address = sock.getsockname()[0]
+        except OSError:
+            address = '127.0.0.1'
+    if address.startswith('127.'):
+        pytest.skip('no non-loopback address to test the bind address against')
+    return address
 
 
 def free_port() -> int:
@@ -115,7 +129,8 @@ def solution(tmp_path_factory):
                    'config': str(SCRIPTS_DIR / 'th2-rpt-viewer' / 'custom.json')},
         'kernel': {'venv': str(kernel_venv)},
         'jupyter': {'data-dir': str(tmp_path / 'jupyter-data')},
-        'json-stream-provider': {'script': str(REPO_ROOT / 'server.py')},
+        'json-stream-provider': {'script': str(REPO_ROOT / 'server.py'),
+                                 'log-config': str(LOG4PY_CONF)},
         'runtime-dir': str(tmp_path / 'runtime'),
     }
     config_path = tmp_path / 'config.yaml'
@@ -167,6 +182,25 @@ def test_provider_is_reachable_through_the_proxy(solution):
 
     assert response.status_code == 200
     assert response.json() == {'status': 'ok'}
+
+
+def test_provider_binds_only_the_configured_host(solution):
+    """`host: 127.0.0.1` has to reach the provider too, not just the viewer and Jupyter."""
+    port = int(solution.provider.rsplit(':', 1)[1])
+    with socket.socket() as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # binding another interface succeeds only while the provider is not listening on all of them
+        sock.bind((_non_loopback_address(), port))
+
+    assert requests.get(solution.provider + '/status', timeout=10).status_code == 200
+
+
+def test_provider_uses_the_configured_logging(solution):
+    """Otherwise it falls back to its built-in DEBUG configuration."""
+    log = solution.log.read_text()
+
+    assert 'log4py.conf file' in log, log[-2000:]
+    assert 'Logger is configured by default' not in log
 
 
 def test_jupyter_serves_the_workspace(solution):
@@ -234,7 +268,8 @@ def test_shuts_everything_down_on_interrupt(tmp_path_factory):
                    'config': str(SCRIPTS_DIR / 'th2-rpt-viewer' / 'custom.json')},
         'kernel': {'venv': str(kernel_venv)},
         'jupyter': {'data-dir': str(tmp_path / 'jupyter-data')},
-        'json-stream-provider': {'script': str(REPO_ROOT / 'server.py')},
+        'json-stream-provider': {'script': str(REPO_ROOT / 'server.py'),
+                                 'log-config': str(LOG4PY_CONF)},
         'runtime-dir': str(tmp_path / 'runtime'),
     }))
 

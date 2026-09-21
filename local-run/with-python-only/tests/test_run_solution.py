@@ -206,6 +206,47 @@ class TestGeneratedFiles:
         assert written['virtual-environment-dir'] == str(settings.kernel_venv)
         assert written['python-kernel-name'] == '.venv'
 
+    def test_provider_config_carries_the_host(self, tmp_path):
+        """Without this the provider would bind every interface whatever `host` says."""
+        settings = run_solution.load_settings(write_config(tmp_path, {'host': '127.0.0.1'}))
+        run_solution.prepare_workspace(settings)
+
+        written = json.loads(run_solution.write_provider_config(settings).read_text())
+
+        assert written['host'] == '127.0.0.1'
+
+    def test_log_config_key_does_not_leak_into_the_provider_options(self, tmp_path):
+        settings = run_solution.load_settings(write_config(tmp_path))
+        run_solution.prepare_workspace(settings)
+
+        written = json.loads(run_solution.write_provider_config(settings).read_text())
+
+        # it travels through the environment, the provider would not understand it here
+        assert 'log-config' not in written
+
+    def test_log_config_is_written_next_to_the_provider_config(self, tmp_path):
+        """That is where the provider looks for it, the same as /var/th2/config in a container."""
+        (tmp_path / 'log4py.conf').write_text('[loggers]\nkeys=root\n')
+        settings = run_solution.load_settings(
+            write_config(tmp_path, {'json-stream-provider': {'log-config': './log4py.conf'}}))
+        run_solution.prepare_workspace(settings)
+
+        provider_config = run_solution.write_provider_config(settings)
+
+        written = provider_config.parent / 'log4py.conf'
+        assert written.is_file()
+        assert written.read_text() == '[loggers]\nkeys=root\n'
+
+    def test_absent_log_config_is_skipped(self, tmp_path):
+        settings = run_solution.load_settings(
+            write_config(tmp_path, {'json-stream-provider': {'log-config': './absent.conf'}}))
+        run_solution.prepare_workspace(settings)
+
+        provider_config = run_solution.write_provider_config(settings)
+
+        # the provider falls back to its built-in configuration, which is better than crashing
+        assert not (provider_config.parent / 'log4py.conf').exists()
+
     def test_viewer_config_is_written_where_the_viewer_fetches_it(self, tmp_path):
         settings = run_solution.load_settings(write_config(tmp_path))
 
@@ -274,6 +315,7 @@ class TestCommands:
 
         assert environment['JUPYTER_DATA_DIR'] == str(settings.jupyter_data_dir)
         assert environment['PYTHONUNBUFFERED'] == '1'
+
 
 
 class TestKernelVenv:

@@ -3,7 +3,7 @@
 # Relative paths are resolved against the directory holding this file, so the whole directory can
 # be moved or unpacked anywhere without editing the paths.
 
-# address the three servers bind to, 0.0.0.0 exposes them outside of this machine
+# address all three servers bind to, 0.0.0.0 exposes them outside of this machine
 host: 127.0.0.1
 
 ports:
@@ -40,6 +40,9 @@ jupyter:
 json-stream-provider:
   # path to server.py, autodetected next to this file and then in the repository root
   script: null
+  # logging configuration, copied next to the generated custom.json, where the provider looks
+  # for it just as it does in /var/th2/config inside a container
+  log-config: ./json-stream-provider/log4py.conf
   out-of-use-engine-time: 3600
   cleanup-horizon-days: -1
   restart-kernel-on-error: false

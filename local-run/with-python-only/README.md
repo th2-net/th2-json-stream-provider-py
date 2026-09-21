@@ -16,6 +16,7 @@ docker image, so its JS static has to be extracted from there. Nothing at run ti
 | `prepare_viewer.py` | extracts the th2-rpt-viewer JS static out of its docker image |
 | `serve_static.py` | serves the viewer and proxies its API calls to th2-json-stream-provider |
 | `th2-rpt-viewer/custom.json` | viewer configuration, copied into the extracted static |
+| `json-stream-provider/log4py.conf` | provider logging configuration |
 | `th2-rpt-viewer/static/` | the extracted viewer, produced by `prepare_viewer.py` (git-ignored) |
 | `tests/` | pytest suite for the scripts of this directory |
 | `requirements-dev.txt` | dependencies for running the tests |
@@ -109,13 +110,16 @@ the notebook environment up front and `j-sp` reuses it. Both processes also shar
 `JUPYTER_DATA_DIR` inside the solution, so the kernel `j-sp` registers is the kernel Jupyter lists,
 and nothing is written to `~/.local/share/jupyter`.
 
+### Logging
+
+`j-sp` reads `log4py.conf` from the directory of the configuration file it is given, the same way
+it picks both up from `/var/th2/config` inside a container. `run_solution.py` therefore copies
+`json-stream-provider/log4py.conf` next to the generated `custom.json`. Edit the source file and
+restart to change the provider log level; without it `j-sp` falls back to its built-in `DEBUG`
+configuration.
+
 ### Known limitations
 
-* `j-sp` binds `0.0.0.0` regardless of `host`, it takes no bind address from its configuration.
-  Only the `port` is configurable, so `host` affects the viewer and Jupyter alone.
-* `j-sp` reads its logging configuration from the hardcoded `/var/th2/config/log4py.conf`. That
-  path does not exist outside the container, so it falls back to its built-in `DEBUG` configuration
-  and `json-stream-provider/log4py.conf` is not picked up.
 * An empty `jupyter.token` disables Jupyter authentication. That is acceptable while bound to
   `127.0.0.1`, but set a token before changing `host`.
 

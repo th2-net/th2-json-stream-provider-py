@@ -19,6 +19,14 @@ This python server is made to launch Jupyter notebooks (*.ipynb) and get results
   Please note: `j-sp` docker image creates `/opt/conda/bin/python` and `/opt/conda/bin/pip` links to mimics environment of `jupter/datascience-notebook` docker image  
 * `python-kernel-name` (Default value: .venv) - `j-sp` isntall ipykernel with this name using virtual environment specified in `virtual-environment-dir`
 * `port` (Default value: 8080) - TCP port `j-sp` listens on. The default matches the `clusterIP` container port used in th2 deployments, so it should be changed only when `j-sp` runs outside of a container and the default port is already taken.
+* `host` (Default value: all interfaces) - address `j-sp` binds to. Binding every interface is what a container needs, set it to `127.0.0.1` to keep `j-sp` reachable only from the same machine when it runs outside of a container.
+
+### logging:
+
+`j-sp` configures logging from the `log4py.conf` file lying next to the custom configuration it is given.
+Inside a container both come from `/var/th2/config`, which th2 deployments fill from the `customConfig` and `loggingConfig` of the box definition.
+Outside of a container the same rule applies to whatever directory the configuration argument points at.
+When that file does not exist `j-sp` falls back to its built-in `DEBUG` configuration.
 
 ### mounting:
 

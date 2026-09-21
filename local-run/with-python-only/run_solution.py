@@ -40,6 +40,9 @@ import yaml
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
+# the provider reads its logging configuration from this name next to its custom.json
+LOG4PY_FILE_NAME = 'log4py.conf'
+
 DEFAULTS = {
     'host': '127.0.0.1',
     'ports': {'viewer': 8080, 'json-stream-provider': 8081, 'jupyter': 8082},
@@ -48,8 +51,9 @@ DEFAULTS = {
     'kernel': {'venv': './kernel-venv', 'name': '.venv', 'display-name': 'Python (.venv)'},
     'jupyter': {'base-url': '/jupyter/', 'token': '', 'open-browser': False,
                 'data-dir': './jupyter-data'},
-    'json-stream-provider': {'script': None, 'out-of-use-engine-time': 3600,
-                             'cleanup-horizon-days': -1, 'restart-kernel-on-error': False},
+    'json-stream-provider': {'script': None, 'log-config': './json-stream-provider/log4py.conf',
+                             'out-of-use-engine-time': 3600, 'cleanup-horizon-days': -1,
+                             'restart-kernel-on-error': False},
     'runtime-dir': './runtime',
 }
 
@@ -77,6 +81,7 @@ class Settings:
     jupyter_open_browser: bool
     jupyter_data_dir: Path
     provider_script: Path
+    provider_log_config: Path
     provider_options: dict
     runtime_dir: Path
     python: str = sys.executable
@@ -141,6 +146,7 @@ def load_settings(config_path: Path) -> Settings:
 
     provider = dict(config['json-stream-provider'])
     script = provider.pop('script', None)
+    log_config = provider.pop('log-config', None)
     jupyter = config['jupyter']
     kernel = config['kernel']
     return Settings(
@@ -159,6 +165,7 @@ def load_settings(config_path: Path) -> Settings:
         jupyter_open_browser=bool(jupyter['open-browser']),
         jupyter_data_dir=resolve(jupyter['data-dir']),
         provider_script=resolve(script) if script else find_provider_script(base_dir),
+        provider_log_config=resolve(log_config) if log_config else None,
         provider_options=provider,
         runtime_dir=resolve(config['runtime-dir']),
     )
@@ -179,12 +186,29 @@ def write_provider_config(settings: Settings) -> Path:
         'logs': str(settings.logs_dir),
         'python-kernel-name': settings.kernel_name,
         'virtual-environment-dir': str(settings.kernel_venv),
+        'host': settings.host,
         'port': settings.provider_port,
         **settings.provider_options,
     }
     destination = settings.provider_config
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(config, indent=2) + '\n')
+    write_provider_log_config(settings)
+    return destination
+
+
+def write_provider_log_config(settings: Settings) -> Path:
+    """Puts the logging configuration next to the generated custom.json.
+
+    The provider resolves `log4py.conf` against the directory of the configuration it is given,
+    the same way it picks both of them up from /var/th2/config inside a container.
+    """
+    source = settings.provider_log_config
+    if source is None or not source.is_file():
+        return None
+    destination = settings.provider_config.parent / LOG4PY_FILE_NAME
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(source.read_text())
     return destination
 
 
