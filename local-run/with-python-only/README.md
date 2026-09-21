@@ -12,6 +12,7 @@ docker image, so its JS static has to be extracted from there. Nothing at run ti
 | Path | Description |
 | --- | --- |
 | `prepare_viewer.py` | extracts the th2-rpt-viewer JS static out of its docker image |
+| `serve_static.py` | serves the viewer and proxies its API calls to th2-json-stream-provider |
 | `th2-rpt-viewer/custom.json` | viewer configuration, copied into the extracted static |
 | `th2-rpt-viewer/static/` | the extracted viewer, produced by `prepare_viewer.py` (git-ignored) |
 | `tests/` | pytest suite for the scripts of this directory |
@@ -63,8 +64,48 @@ Note that th2-rpt-viewer talks to `j-sp` through the relative `json-stream-provi
 the static server proxies. If a future viewer version changes that URL, the proxy prefix has to be
 changed to match.
 
+## `serve_static.py`
+
+Serves the extracted viewer and proxies its API calls to `j-sp`, replacing the nginx reverse proxy
+of the compose based setup. th2-rpt-viewer requests the provider through the relative
+`json-stream-provider/...` URL, so everything under that prefix is forwarded to `j-sp` with the
+prefix stripped, and everything else is served from the static directory.
+
+```bash
+python3 serve_static.py --port 8080 --backend-port 8081 --directory th2-rpt-viewer/static
+python3 serve_static.py 8080 8081 th2-rpt-viewer/static   # positional form
+```
+
+### Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--port` | `8080` | port to listen on |
+| `--backend-host` | `127.0.0.1` | host th2-json-stream-provider listens on |
+| `--backend-port` | `8081` | port th2-json-stream-provider listens on |
+| `--bind` | `0.0.0.0` | address to bind to |
+| `--directory` | required | directory with the th2-rpt-viewer static |
+| `--prefix` | `/json-stream-provider` | URL prefix proxied to the provider |
+
+The provider port must match the `port` of the `j-sp` `custom.json`.
+
+`GET`, `HEAD` and `POST` are proxied — `POST` is what the viewer uses to start (`/execute`) and
+stop (`/stop`) notebook runs. Hop-by-hop headers are re-created for each hop, everything else,
+including the `engine_user_id` cookie the provider sets, is passed through unchanged.
+
+## Tests
+
+The scripts of this directory are covered by a pytest suite. It needs neither a container runtime
+nor a running `j-sp`: the container archive and the provider are stubbed.
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests
+```
+
 ## Requirements
 
 * Python 3.12
 * `podman` or `docker`, for `prepare_viewer.py` only
 * network access to `ghcr.io` on the first extraction
+* `requests`, for `serve_static.py`
