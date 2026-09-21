@@ -1,4 +1,4 @@
-# th2-json-stream-provider (j-sp) (0.2.0)
+# th2-json-stream-provider (j-sp) (0.2.1)
 
 This python server is made to launch Jupyter notebooks (*.ipynb) and get results from them.
 
@@ -297,6 +297,13 @@ chmod -R g=u user_data/
     ```
 
 ## Release notes:
+
+### 0.2.1
+
+* added `host` and `port` options
+* changed: `log4py.conf` is read from the directory of the custom configuration instead of the hardcoded `/var/th2/config/`.
+  Both come from `/var/th2/config/` inside a container, so a th2 deployment is unaffected.
+* added local run with python only
 
 ### 0.2.0
 

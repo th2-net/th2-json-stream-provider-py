@@ -139,12 +139,12 @@ class TestArchives:
 
     @pytest.mark.parametrize('extension', ['.tar.gz', '.zip'])
     def test_a_dotted_version_survives_the_name(self, tmp_path, extension):
-        """Regression: with_suffix turned 0.2.0 into 0.2."""
-        destination = tmp_path / 'th2-json-stream-provider-local-run-0.2.0'
+        """Regression: with_suffix turned 0.2.1 into 0.2."""
+        destination = tmp_path / 'th2-json-stream-provider-local-run-0.2.1'
 
         archive = build_distributive.archive_path(destination, extension)
 
-        assert archive.name == f'th2-json-stream-provider-local-run-0.2.0{extension}'
+        assert archive.name == f'th2-json-stream-provider-local-run-0.2.1{extension}'
 
     def test_describe_reports_a_checksum(self, tmp_path):
         archive = tmp_path / 'sample.tar.gz'

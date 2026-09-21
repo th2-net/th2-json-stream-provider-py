@@ -121,7 +121,7 @@ def extract_viewer(runtime: str = None, python: str = sys.executable) -> None:
 
 
 def archive_path(destination: Path, extension: str) -> Path:
-    # not with_suffix: a version like 0.2.0 ends in what looks like a suffix and would be eaten
+    # not with_suffix: a version like 0.2.1 ends in what looks like a suffix and would be eaten
     return destination.parent / (destination.name + extension)
 
 
