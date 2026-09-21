@@ -1,0 +1,5 @@
+# produced by prepare_viewer.py out of the th2-rpt-viewer docker image
+/th2-rpt-viewer/static/
+
+__pycache__/
+.pytest_cache/
