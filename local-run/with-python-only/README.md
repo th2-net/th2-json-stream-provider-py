@@ -18,6 +18,7 @@ docker image, so its JS static has to be extracted from there. Nothing at run ti
 | `th2-rpt-viewer/custom.json` | viewer configuration, copied into the extracted static |
 | `json-stream-provider/log4py.conf` | provider logging configuration |
 | `th2-rpt-viewer/static/` | the extracted viewer, produced by `prepare_viewer.py` (git-ignored) |
+| `requirements.txt` | dependencies of the solution |
 | `tests/` | pytest suite for the scripts of this directory |
 | `requirements-dev.txt` | dependencies for running the tests |
 | `workspace/` | notebooks, results and logs, created on the first start (git-ignored) |
@@ -76,6 +77,7 @@ Launches Jupyter, `j-sp` and the viewer together, the equivalent of `docker comp
 setup.
 
 ```bash
+pip install -r requirements.txt
 python3 prepare_viewer.py     # once, needs docker/podman
 python3 run_solution.py       # uses ./config.yaml
 ```
@@ -162,6 +164,9 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
+The default suite needs neither `j-sp` nor Jupyter installed, so `requirements-dev.txt` stays
+light on purpose.
+
 There is also an end to end suite that starts the real solution, runs `example.ipynb` through the
 viewer's proxy and reads its results back through Jupyter. It needs the full requirements and the
 extracted viewer, so it is opt-in and skips itself when either is missing:
@@ -173,6 +178,15 @@ pytest -m integration
 ## Requirements
 
 * Python 3.12
+* `pip install -r requirements.txt`
 * `podman` or `docker`, for `prepare_viewer.py` only
 * network access to `ghcr.io` on the first extraction
-* `requests`, for `serve_static.py`
+
+`requirements.txt` includes the repository root `requirements.txt` by reference rather than
+copying it, so the dependabot updates of `j-sp` itself apply here too. On top of those it adds
+`jupyterlab`, `PyYAML` and `requests`. `build_distributive.py` flattens the include, because a
+distributive has no directory above it.
+
+The notebook environment is separate and is created by `run_solution.py`, see
+[One workspace](#one-workspace). Packages a notebook needs are installed into it from the notebook
+itself, as in the compose setup.

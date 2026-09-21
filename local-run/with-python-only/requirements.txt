@@ -1,0 +1,13 @@
+# Dependencies of the python only local run.
+#
+# th2-json-stream-provider itself, included rather than copied so that the dependabot updates of
+# the repository root apply here too. `build_distributive.py` flattens this into a plain list,
+# because the distributive has no directory above it.
+-r ../../requirements.txt
+
+# jupyter, the notebook frontend of the solution
+jupyterlab~=4.6.3
+# run_solution.py, configuration
+PyYAML~=6.0.3
+# serve_static.py, proxying to the provider
+requests~=2.34.2
