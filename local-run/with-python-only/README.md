@@ -11,12 +11,17 @@ docker image, so its JS static has to be extracted from there. Nothing at run ti
 
 | Path | Description |
 | --- | --- |
+| `run_solution.py` | configures and launches the whole solution |
+| `config.yaml` | configuration of `run_solution.py` |
 | `prepare_viewer.py` | extracts the th2-rpt-viewer JS static out of its docker image |
 | `serve_static.py` | serves the viewer and proxies its API calls to th2-json-stream-provider |
 | `th2-rpt-viewer/custom.json` | viewer configuration, copied into the extracted static |
 | `th2-rpt-viewer/static/` | the extracted viewer, produced by `prepare_viewer.py` (git-ignored) |
 | `tests/` | pytest suite for the scripts of this directory |
 | `requirements-dev.txt` | dependencies for running the tests |
+| `workspace/` | notebooks, results and logs, created on the first start (git-ignored) |
+| `kernel-venv/` | virtual environment the notebooks run in (git-ignored) |
+| `runtime/`, `jupyter-data/` | generated configuration and kernel registration (git-ignored) |
 
 ## `prepare_viewer.py`
 
@@ -64,6 +69,56 @@ Note that th2-rpt-viewer talks to `j-sp` through the relative `json-stream-provi
 the static server proxies. If a future viewer version changes that URL, the proxy prefix has to be
 changed to match.
 
+## `run_solution.py`
+
+Launches Jupyter, `j-sp` and the viewer together, the equivalent of `docker compose up` for this
+setup.
+
+```bash
+python3 prepare_viewer.py     # once, needs docker/podman
+python3 run_solution.py       # uses ./config.yaml
+```
+
+It generates the provider `custom.json` out of `config.yaml`, copies the viewer configuration into
+the static, creates the notebook virtual environment on the first start, and then runs the three
+servers as child processes. Their output is streamed with a `[j-sp]`, `[viewer]` or `[jupyter]`
+prefix. Ctrl+C, or any one of them exiting, stops all three.
+
+| Option | Description |
+| --- | --- |
+| `--config` | yaml configuration to use (default: `config.yaml` next to the script) |
+| `--wheelhouse` | install `ipykernel` from this directory instead of from the network |
+| `--skip-kernel-venv` | do not create or check the notebook virtual environment |
+
+### Configuration
+
+See the comments in [`config.yaml`](config.yaml). Relative paths are resolved against the directory
+holding the configuration file, so the solution can be unpacked and run anywhere.
+
+### One workspace
+
+`workspace` is the single root of everything: `notebooks/`, `results/`, `results/images/` and
+`logs/`. `j-sp` is pointed at exactly those directories and Jupyter is opened on their parent,
+which is what makes **every directory the provider uses visible in Jupyter** — no mounts or
+symlinks, unlike the compose setup.
+
+The kernel needs the same treatment. `j-sp` registers it itself, but a virtual environment created
+from inside another one inherits the packages of the base interpreter rather than of the
+environment `j-sp` runs in, so `ipykernel` would be missing. `run_solution.py` therefore creates
+the notebook environment up front and `j-sp` reuses it. Both processes also share a
+`JUPYTER_DATA_DIR` inside the solution, so the kernel `j-sp` registers is the kernel Jupyter lists,
+and nothing is written to `~/.local/share/jupyter`.
+
+### Known limitations
+
+* `j-sp` binds `0.0.0.0` regardless of `host`, it takes no bind address from its configuration.
+  Only the `port` is configurable, so `host` affects the viewer and Jupyter alone.
+* `j-sp` reads its logging configuration from the hardcoded `/var/th2/config/log4py.conf`. That
+  path does not exist outside the container, so it falls back to its built-in `DEBUG` configuration
+  and `json-stream-provider/log4py.conf` is not picked up.
+* An empty `jupyter.token` disables Jupyter authentication. That is acceptable while bound to
+  `127.0.0.1`, but set a token before changing `host`.
+
 ## `serve_static.py`
 
 Serves the extracted viewer and proxies its API calls to `j-sp`, replacing the nginx reverse proxy
@@ -100,7 +155,15 @@ nor a running `j-sp`: the container archive and the provider are stubbed.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests
+pytest
+```
+
+There is also an end to end suite that starts the real solution, runs `example.ipynb` through the
+viewer's proxy and reads its results back through Jupyter. It needs the full requirements and the
+extracted viewer, so it is opt-in and skips itself when either is missing:
+
+```bash
+pytest -m integration
 ```
 
 ## Requirements
