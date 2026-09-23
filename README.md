@@ -305,10 +305,11 @@ chmod -R g=u user_data/
   Both come from `/var/th2/config/` inside a container, so a th2 deployment is unaffected.
 * added local run with python only
 * updated:
-  * aiohttp~=3.14.0
+  * aiohttp~=3.14.3
   * ipykernel~=7.3.0
   * papermill~=2.7.0
-  * nbclient~=0.10.4
+  * nbclient~=0.11.0
+  * nbformat~=5.11.1
 
 ### 0.2.0
 
