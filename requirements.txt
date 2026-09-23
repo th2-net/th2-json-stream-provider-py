@@ -4,4 +4,4 @@ aiojobs~=1.4.0
 ipykernel~=7.3.0
 papermill~=2.7.0
 nbclient~=0.10.4
-nbformat~=5.10.4
+nbformat~=5.11.1
