@@ -1,4 +1,4 @@
-# th2-json-stream-provider (j-sp) (0.2.0)
+# th2-json-stream-provider (j-sp) (0.2.1)
 
 This python server is made to launch Jupyter notebooks (*.ipynb) and get results from them.
 
@@ -18,6 +18,15 @@ This python server is made to launch Jupyter notebooks (*.ipynb) and get results
 * `virtual-environment-dir` (Default value: /home/json-stream/.venv) - `j-sp` creates python virtual environment from this folder or reuse virtual environment if folder already exists.
   Please note: `j-sp` docker image creates `/opt/conda/bin/python` and `/opt/conda/bin/pip` links to mimics environment of `jupter/datascience-notebook` docker image  
 * `python-kernel-name` (Default value: .venv) - `j-sp` isntall ipykernel with this name using virtual environment specified in `virtual-environment-dir`
+* `port` (Default value: 8080) - TCP port `j-sp` listens on. The default matches the `clusterIP` container port used in th2 deployments, so it should be changed only when `j-sp` runs outside of a container and the default port is already taken.
+* `host` (Default value: all interfaces) - address `j-sp` binds to. Binding every interface is what a container needs, set it to `127.0.0.1` to keep `j-sp` reachable only from the same machine when it runs outside of a container.
+
+### logging:
+
+`j-sp` configures logging from the `log4py.conf` file lying next to the custom configuration it is given.
+Inside a container both come from `/var/th2/config`, which th2 deployments fill from the `customConfig` and `loggingConfig` of the box definition.
+Outside of a container the same rule applies to whatever directory the configuration argument points at.
+When that file does not exist `j-sp` falls back to its built-in `DEBUG` configuration.
 
 ### mounting:
 
@@ -288,6 +297,19 @@ chmod -R g=u user_data/
     ```
 
 ## Release notes:
+
+### 0.2.1
+
+* added `host` and `port` options
+* changed: `log4py.conf` is read from the directory of the custom configuration instead of the hardcoded `/var/th2/config/`.
+  Both come from `/var/th2/config/` inside a container, so a th2 deployment is unaffected.
+* added local run with python only
+* updated:
+  * aiohttp~=3.14.3
+  * ipykernel~=7.3.0
+  * papermill~=2.7.0
+  * nbclient~=0.11.0
+  * nbformat~=5.11.1
 
 ### 0.2.0
 

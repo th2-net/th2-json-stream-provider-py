@@ -1,0 +1,7 @@
+# Dependencies for running the tests, see tests/
+#
+# This covers the default suite only. The integration tests start the real solution, so they also
+# need `-r requirements.txt`; without it they skip themselves.
+pytest~=9.1.1
+PyYAML~=6.0.3
+requests~=2.34.2

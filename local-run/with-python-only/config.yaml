@@ -1,0 +1,51 @@
+# Configuration of `run_solution.py`.
+#
+# Relative paths are resolved against the directory holding this file, so the whole directory can
+# be moved or unpacked anywhere without editing the paths.
+
+# address all three servers bind to, 0.0.0.0 exposes them outside of this machine
+host: 127.0.0.1
+
+ports:
+  # entry point: th2-rpt-viewer plus the proxy to the provider
+  viewer: 8080
+  # must match the `port` written into the generated provider configuration
+  json-stream-provider: 8081
+  jupyter: 8082
+
+# root of everything the solution reads and writes: notebooks, results, images and logs.
+# It is also the directory Jupyter opens, which is what makes every directory the provider uses
+# visible there.
+workspace: ./workspace
+
+viewer:
+  # produced by `prepare_viewer.py`
+  static: ./th2-rpt-viewer/static
+  config: ./th2-rpt-viewer/custom.json
+
+kernel:
+  # virtual environment the notebooks run in, created on the first start
+  venv: ./kernel-venv
+  name: .venv
+  display-name: Python (.venv)
+
+jupyter:
+  base-url: /jupyter/
+  # empty token disables authentication, which is acceptable only while bound to 127.0.0.1
+  token: ''
+  open-browser: false
+  # keeping the kernel registration next to the solution instead of in ~/.local/share/jupyter
+  data-dir: ./jupyter-data
+
+json-stream-provider:
+  # path to server.py, autodetected next to this file and then in the repository root
+  script: null
+  # logging configuration, copied next to the generated custom.json, where the provider looks
+  # for it just as it does in /var/th2/config inside a container
+  log-config: ./json-stream-provider/log4py.conf
+  out-of-use-engine-time: 3600
+  cleanup-horizon-days: -1
+  restart-kernel-on-error: false
+
+# generated provider configuration and other files produced at start up
+runtime-dir: ./runtime
