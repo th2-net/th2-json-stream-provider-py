@@ -15,16 +15,30 @@
 import logging.config
 import os
 
-log4py_file = '/var/th2/config/log4py.conf'
+# /var/th2/config is where th2 components get all of their configuration inside a container
+default_config_dir = '/var/th2/config'
+log4py_file_name = 'log4py.conf'
+log4py_file = os.path.join(default_config_dir, log4py_file_name)
 
 
-def configure_logging():
-    if os.path.exists(log4py_file):
-        logging.config.fileConfig(log4py_file, disable_existing_loggers=False)
-        logging.getLogger(__name__).info(f'Logger is configured by {log4py_file} file')
+def resolve_log4py_file(config_dir: str = None) -> str:
+    """The logging configuration lives next to the custom configuration it belongs to."""
+    if config_dir:
+        return os.path.join(config_dir, log4py_file_name)
+    return log4py_file
+
+
+def configure_logging(config_dir: str = None):
+    configured_file = resolve_log4py_file(config_dir)
+    if os.path.exists(configured_file):
+        logging.config.fileConfig(configured_file, disable_existing_loggers=False)
+        logging.getLogger(__name__).info(f'Logger is configured by {configured_file} file')
     else:
         default_logging_config = {
             'version': 1,
+            # logging is configured after the module loggers are created, disabling them here
+            # would silence every logger the application already holds
+            'disable_existing_loggers': False,
             'formatters': {
                 'default': {
                     'format': '%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s',

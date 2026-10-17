@@ -1,0 +1,14 @@
+# produced by prepare_viewer.py out of the th2-rpt-viewer docker image
+/th2-rpt-viewer/static/
+
+# produced by build_distributive.py
+/dist/
+
+# produced by run_solution.py at start up
+/workspace/
+/kernel-venv/
+/jupyter-data/
+/runtime/
+
+__pycache__/
+.pytest_cache/
