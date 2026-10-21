@@ -21,7 +21,7 @@ This is the `compose.yml` equivalent of the python only setup. It is driven by `
     python3 run_solution.py --config my.yaml
 
 The three servers run as child processes, their output is streamed with a per-process prefix, and
-they are shut down together when one of them exits or on Ctrl+C.
+they are shut down together when one of them exits, on Ctrl+C or on a plain `kill`.
 """
 
 import argparse
@@ -343,6 +343,10 @@ def print_urls(settings: Settings) -> None:
     print('', flush=True)
 
 
+def _interrupt(signum, frame) -> None:
+    raise KeyboardInterrupt
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -369,6 +373,8 @@ def main() -> int:
 
     supervisor = Supervisor(child_environment(settings), cwd=settings.workspace)
     interrupted = False
+    # a plain `kill` stops the solution the same way Ctrl+C does, instead of orphaning the servers
+    previous_sigterm = signal.signal(signal.SIGTERM, _interrupt)
     try:
         for name, command in build_commands(settings):
             print(f'starting {name}', flush=True)
@@ -382,7 +388,10 @@ def main() -> int:
         print('\nstopping the solution', flush=True)
         return 0
     finally:
+        # a repeated `kill` must not cut the shutdown short
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
         supervisor.shutdown()
+        signal.signal(signal.SIGTERM, previous_sigterm)
         if interrupted:
             # restore the default handler so a second Ctrl+C is not swallowed
             signal.signal(signal.SIGINT, signal.SIG_DFL)

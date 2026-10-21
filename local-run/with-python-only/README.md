@@ -87,7 +87,7 @@ python3 run_solution.py       # uses ./config.yaml
 It generates the provider `custom.json` out of `config.yaml`, copies the viewer configuration into
 the static, creates the notebook virtual environment on the first start, and then runs the three
 servers as child processes. Their output is streamed with a `[j-sp]`, `[viewer]` or `[jupyter]`
-prefix. Ctrl+C, or any one of them exiting, stops all three.
+prefix. Ctrl+C, a plain `kill`, or any one of them exiting, stops all three.
 
 | Option | Description |
 | --- | --- |
@@ -194,6 +194,42 @@ python3 run_solution.py
 `pytest -m integration` inside the unpacked directory starts the solution, runs the bundled
 `example.ipynb` through the viewer and checks the results, which is a quick way to confirm the
 deployment works.
+
+### How to run / stop the distributive using `nohup`
+
+`run_solution.py` stays in the foreground and stops with the terminal. To keep the solution
+running after logging out, start it with `nohup` from the unpacked directory, and save its pid
+for stopping it later:
+
+```bash
+nohup python3 run_solution.py > run_solution.log 2>&1 &
+echo $! > run_solution.pid
+```
+
+All output, prefixed with `[j-sp]`, `[viewer]` or `[jupyter]`, goes to `run_solution.log`,
+including the URLs printed once the servers are started:
+
+```bash
+tail -f run_solution.log
+```
+
+To stop the solution, `kill` it and wait for it to shut down:
+
+```bash
+kill "$(cat run_solution.pid)"
+while kill -0 "$(cat run_solution.pid)" 2>/dev/null; do sleep 1; done
+rm run_solution.pid
+```
+
+`run_solution.py` treats `SIGTERM`, sent by a plain `kill`, the same as Ctrl+C: it stops `j-sp`,
+the viewer and Jupyter, waits up to 10 seconds for them to exit and kills whichever is still
+running. `kill -INT` works the same way. Only `kill -9` cuts that short and leaves the three
+servers running and holding their ports. If that has happened, stop them by the solution
+directory, which all their command lines contain:
+
+```bash
+pkill -f "$(pwd -P)/"
+```
 
 ### Offline installs
 

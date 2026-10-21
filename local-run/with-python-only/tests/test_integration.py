@@ -259,8 +259,9 @@ def test_runs_a_notebook_and_publishes_its_results(solution):
     assert any(name.endswith('.jsonl') for name in names), names
 
 
-def test_shuts_everything_down_on_interrupt(tmp_path_factory):
-    """Ctrl+C has to stop all three servers, leaving nothing behind holding the ports."""
+@pytest.mark.parametrize('signum', [signal.SIGINT, signal.SIGTERM], ids=['ctrl-c', 'kill'])
+def test_shuts_everything_down_on_interrupt(tmp_path_factory, signum):
+    """Ctrl+C or a plain `kill` has to stop all three servers, leaving nothing holding the ports."""
     reason = missing_requirement()
     if reason:
         pytest.skip(reason)
@@ -297,7 +298,7 @@ def test_shuts_everything_down_on_interrupt(tmp_path_factory):
                                       capture_output=True, text=True).stdout.split()
             assert len(children) == 3, children
 
-            process.send_signal(signal.SIGINT)
+            process.send_signal(signum)
             process.wait(timeout=60)
         finally:
             if process.poll() is None:

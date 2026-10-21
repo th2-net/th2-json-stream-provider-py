@@ -20,6 +20,8 @@ and needs neither Jupyter nor the provider.
 """
 
 import json
+import os
+import signal
 import sys
 import textwrap
 import time
@@ -427,6 +429,46 @@ class TestSupervisor:
         supervisor.shutdown(timeout=1.0)
 
         assert process.poll() is not None
+
+
+class TestMain:
+
+    def run_until_signalled(self, tmp_path, monkeypatch, signum):
+        """Runs `main` on a sleeping stand-in server and sends `signum` once it is up."""
+        config_path = write_config(tmp_path)
+        started = []
+
+        def commands(settings):
+            return [('sleeper', [sys.executable, '-c', 'import time; time.sleep(30)'])]
+
+        def signalled_wait(supervisor, poll_interval=0.5):
+            started.extend(process for _, process in supervisor.processes)
+            os.kill(os.getpid(), signum)
+            time.sleep(30)
+
+        monkeypatch.setattr(sys, 'argv', ['run_solution.py', '--config', str(config_path),
+                                          '--skip-kernel-venv'])
+        monkeypatch.setattr(run_solution, 'build_commands', commands)
+        monkeypatch.setattr(run_solution.Supervisor, 'wait', signalled_wait)
+        return run_solution.main(), started
+
+    @pytest.mark.parametrize('signum', [signal.SIGINT, signal.SIGTERM], ids=['ctrl-c', 'kill'])
+    def test_stops_every_child_on_the_signal(self, tmp_path, monkeypatch, signum):
+        previous_sigint = signal.getsignal(signal.SIGINT)
+        try:
+            returncode, started = self.run_until_signalled(tmp_path, monkeypatch, signum)
+        finally:
+            signal.signal(signal.SIGINT, previous_sigint)
+
+        assert returncode == 0
+        assert started and all(process.poll() is not None for process in started)
+
+    def test_restores_the_sigterm_handler(self, tmp_path, monkeypatch):
+        previous_sigterm = signal.getsignal(signal.SIGTERM)
+
+        self.run_until_signalled(tmp_path, monkeypatch, signal.SIGTERM)
+
+        assert signal.getsignal(signal.SIGTERM) is previous_sigterm
 
 
 class TestUrls:
