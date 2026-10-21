@@ -226,8 +226,8 @@ def test_jupyter_lists_the_notebook_kernel(solution):
     response = requests.get(solution.jupyter + '/api/kernelspecs', timeout=10)
 
     kernelspecs = response.json()
-    assert '.venv' in kernelspecs['kernelspecs']
-    assert kernelspecs['default'] == '.venv'
+    assert 'kernel-venv' in kernelspecs['kernelspecs']
+    assert kernelspecs['default'] == 'kernel-venv'
 
 
 def test_runs_a_notebook_and_publishes_its_results(solution):

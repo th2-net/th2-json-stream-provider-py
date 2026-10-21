@@ -48,7 +48,7 @@ DEFAULTS = {
     'ports': {'viewer': 8080, 'json-stream-provider': 8081, 'jupyter': 8082},
     'workspace': './workspace',
     'viewer': {'static': './th2-rpt-viewer/static', 'config': './th2-rpt-viewer/custom.json'},
-    'kernel': {'venv': './kernel-venv', 'name': '.venv', 'display-name': 'Python (.venv)'},
+    'kernel': {'venv': './kernel-venv', 'name': 'kernel-venv'},
     'jupyter': {'base-url': '/jupyter/', 'token': '', 'open-browser': False,
                 'data-dir': './jupyter-data'},
     'json-stream-provider': {'script': None, 'log-config': './json-stream-provider/log4py.conf',
@@ -75,7 +75,6 @@ class Settings:
     viewer_config: Path
     kernel_venv: Path
     kernel_name: str
-    kernel_display_name: str
     jupyter_base_url: str
     jupyter_token: str
     jupyter_open_browser: bool
@@ -159,7 +158,6 @@ def load_settings(config_path: Path) -> Settings:
         viewer_config=resolve(config['viewer']['config']),
         kernel_venv=resolve(kernel['venv']),
         kernel_name=kernel['name'],
-        kernel_display_name=kernel['display-name'],
         jupyter_base_url=jupyter['base-url'],
         jupyter_token=jupyter['token'] or '',
         jupyter_open_browser=bool(jupyter['open-browser']),

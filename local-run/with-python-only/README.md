@@ -114,6 +114,35 @@ the notebook environment up front and `j-sp` reuses it. Both processes also shar
 `JUPYTER_DATA_DIR` inside the solution, so the kernel `j-sp` registers is the kernel Jupyter lists,
 and nothing is written to `~/.local/share/jupyter`.
 
+### How to install python libraries
+
+Notebooks do not run in the environment `run_solution.py` is started from. Both `j-sp` and Jupyter
+execute them in the kernel environment, `kernel.venv` in `config.yaml` (`./kernel-venv` by
+default), which holds only `ipykernel` after the first start. Jupyter lists it as `kernel-venv`,
+`kernel.name`. A library installed into the environment the servers run in is therefore not
+visible to notebooks, and they fail with `ModuleNotFoundError`.
+
+Notebooks saved in the container setup refer to its `.venv` kernel, so Jupyter asks to pick a
+kernel when opening them here. `j-sp` always runs notebooks with `kernel.name`, whatever kernel a
+notebook refers to.
+
+Install libraries notebooks need into the kernel environment instead, from the solution directory:
+
+```bash
+./kernel-venv/bin/python -m pip install <library>
+./kernel-venv/bin/python -m pip install -r my-requirements.txt
+```
+
+There is no need to restart the solution. The next run through the viewer picks the library up,
+while a notebook already open in Jupyter needs `Kernel → Restart Kernel`. Upgrading a library a
+notebook has already imported takes a restart of the solution, because `j-sp` keeps the kernel of
+a notebook alive between runs for `json-stream-provider.out-of-use-engine-time` seconds.
+
+To let notebooks use the same environment as the servers, point `kernel.venv` at it, for
+example `venv: ./.venv`, and restart the solution. It then reuses that environment and installs
+`ipykernel` into it if needed. This saves keeping two environments up to date, but the libraries
+of the notebooks and the dependencies of the solution can then conflict.
+
 ### Logging
 
 `j-sp` reads `log4py.conf` from the directory of the configuration file it is given, the same way

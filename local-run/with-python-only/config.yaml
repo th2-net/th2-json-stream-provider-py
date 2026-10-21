@@ -26,8 +26,8 @@ viewer:
 kernel:
   # virtual environment the notebooks run in, created on the first start
   venv: ./kernel-venv
-  name: .venv
-  display-name: Python (.venv)
+  # the kernel Jupyter lists and j-sp runs notebooks with, its code runs in `venv` above
+  name: kernel-venv
 
 jupyter:
   base-url: /jupyter/

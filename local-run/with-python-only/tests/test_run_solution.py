@@ -55,7 +55,7 @@ class TestMergeDefaults:
 
         assert merged['host'] == '127.0.0.1'
         assert merged['ports']['viewer'] == 8080
-        assert merged['kernel']['name'] == '.venv'
+        assert merged['kernel']['name'] == 'kernel-venv'
 
     def test_overlays_nested_keys_without_dropping_the_rest(self):
         merged = run_solution.merge_defaults({'ports': {'viewer': 9999}})
@@ -85,7 +85,7 @@ class TestLoadSettings:
     def test_applies_defaults_for_absent_sections(self, tmp_path):
         settings = run_solution.load_settings(write_config(tmp_path))
 
-        assert settings.kernel_name == '.venv'
+        assert settings.kernel_name == 'kernel-venv'
         assert settings.jupyter_base_url == '/jupyter/'
         assert settings.runtime_dir == (tmp_path / 'runtime').resolve()
 
@@ -204,7 +204,7 @@ class TestGeneratedFiles:
         written = json.loads(run_solution.write_provider_config(settings).read_text())
 
         assert written['virtual-environment-dir'] == str(settings.kernel_venv)
-        assert written['python-kernel-name'] == '.venv'
+        assert written['python-kernel-name'] == 'kernel-venv'
 
     def test_provider_config_carries_the_host(self, tmp_path):
         """Without this the provider would bind every interface whatever `host` says."""
@@ -304,7 +304,7 @@ class TestCommands:
 
         command = dict(run_solution.build_commands(settings))['jupyter']
 
-        assert '--MultiKernelManager.default_kernel_name=.venv' in command
+        assert '--MultiKernelManager.default_kernel_name=kernel-venv' in command
         assert '--ServerApp.open_browser=False' in command
 
     def test_child_environment_shares_the_jupyter_data_dir(self, tmp_path):
