@@ -57,10 +57,13 @@ log_dir: str = '/home/jupyter-notebook/logs/'
 cleanup_horizon: timedelta = timedelta(weeks=2)
 venv_dir: str = '/home/json-stream/.venv'
 kernel_name: str = '.venv'
+host: str = None  # None binds every interface, which is what a container needs
+port: int = 8080
 
 tasks: dict = {}
 
-configure_logging()
+# logging is configured from the directory of the configuration file, which is known only once the
+# arguments are parsed, see __main__ below
 CustomEngine.create_logger()
 CustomPythonTranslator.create_logger()
 logger: logging.Logger = logging.getLogger('j-sp')
@@ -107,6 +110,8 @@ def read_config(path: str):
     global cleanup_horizon
     global venv_dir
     global kernel_name
+    global host
+    global port
     global logger
     try:
         file = open(path, "r")
@@ -145,6 +150,12 @@ def read_config(path: str):
 
         kernel_name = cfg.get('python-kernel-name', kernel_name)
         logger.info('python-kernel-name=%s', kernel_name)
+
+        host = cfg.get('host', host)
+        logger.info('host=%s', host if host else 'all interfaces')
+
+        port = cfg.get('port', port)
+        logger.info('port=%s', port)
 
         CustomEngine.set_restart_kernel_on_error(restart_kernel_on_error)
         CustomEngine.set_out_of_use_engine_time(out_of_use_engine_time)
@@ -773,6 +784,9 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('config')
     cfg_path = vars(parser.parse_args()).get('config')
+    # the logging configuration sits next to the custom configuration, which is the same
+    # /var/th2/config directory inside a container and an arbitrary one outside of it
+    configure_logging(os.path.dirname(os.path.abspath(cfg_path)) if cfg_path else None)
     if cfg_path:
         read_config(cfg_path)
 
@@ -792,4 +806,4 @@ if __name__ == '__main__':
     app.router.add_route('POST', "/stop", req_stop)
     setup_swagger(app)
     logger.info('starting server')
-    web.run_app(app)
+    web.run_app(app, host=host, port=port)
