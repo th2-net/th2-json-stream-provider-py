@@ -245,6 +245,82 @@ on a different python minor version fails with `No matching distribution found`,
 compiled wheels carry a `cpXY` tag. `wheelhouse/BUILT-FOR.txt` records the target; build the
 distributive on an interpreter matching the machines it is meant for.
 
+### How to update the distributive
+
+A new version unpacks into a directory of its own, `th2-json-stream-provider-local-run-<version>`,
+next to the running one. Everything that belongs to the distributive is replaced by the new
+version, and what the solution and its users produced is carried over:
+
+| Path | On update |
+| --- | --- |
+| `workspace/` | move to the new directory, it holds the notebooks, the results and the logs |
+| `kernel-venv/` | recreate, and reinstall the libraries notebooks need |
+| `config.yaml`, `th2-rpt-viewer/custom.json`, `json-stream-provider/log4py.conf` | carry local changes over by hand |
+| `runtime/`, `jupyter-data/` | nothing, regenerated on every start |
+
+The examples below use `old/` and `new/` for the two unpacked directories. Run them from the
+directory holding both.
+
+1. Unpack the new version and install its requirements, which may have changed, into the
+   environment the solution runs in. A virtual environment cannot be moved, so if it lives inside
+   `old/`, create a new one inside `new/` instead:
+
+   ```bash
+   tar -xzf th2-json-stream-provider-local-run-<version>.tar.gz
+   pip install -r new/requirements.txt
+   ```
+
+   For a distributive built with `--with-wheels`, install from `new/wheelhouse` as described in
+   [Offline installs](#offline-installs).
+
+   `pytest -m integration` inside `new/` checks the new version before it is switched to. It runs
+   on free ports and in a temporary directory, so the old version can keep running meanwhile.
+
+2. Compare the configuration of both versions and carry the local changes over to `new/`. Do not
+   copy the old files over the new ones: a new version may add or rename keys.
+
+   ```bash
+   diff -u new/config.yaml old/config.yaml
+   diff -u new/th2-rpt-viewer/custom.json old/th2-rpt-viewer/custom.json
+   diff -u new/json-stream-provider/log4py.conf old/json-stream-provider/log4py.conf
+   ```
+
+3. Save the list of libraries installed into the notebook environment:
+
+   ```bash
+   old/kernel-venv/bin/python -m pip freeze > kernel-requirements.txt
+   ```
+
+4. Stop the old version, as described in
+   [How to run / stop the distributive using `nohup`](#how-to-run--stop-the-distributive-using-nohup)
+   or with Ctrl+C. Both versions use the same ports, and the workspace must not change while it is
+   being moved.
+
+5. Move the workspace and recreate the notebook environment. A virtual environment holds absolute
+   paths to itself and stops working once moved, so `kernel-venv/` is built anew rather than moved.
+   `run_solution.py` reuses an existing environment and only adds `ipykernel` when it is missing:
+
+   ```bash
+   mv old/workspace new/workspace
+   python3 -m venv new/kernel-venv
+   new/kernel-venv/bin/python -m pip install -r kernel-requirements.txt
+   ```
+
+6. Start the new version from `new/`, as before:
+
+   ```bash
+   cd new
+   python3 run_solution.py
+   ```
+
+Keep `old/` until the new version is confirmed to work. Rolling back is the same steps the other
+way round, which mostly means moving `workspace/` back and starting `old/` again — its
+`kernel-venv/` is still intact. Remove `old/` afterwards.
+
+To skip moving the workspace on every update, point `workspace` in `config.yaml` at a directory
+outside the unpacked one, for example `workspace: /data/th2-workspace`. It is then shared by all
+versions and only `config.yaml` has to carry that setting over.
+
 ## `serve_static.py`
 
 Serves the extracted viewer and proxies its API calls to `j-sp`, replacing the nginx reverse proxy
